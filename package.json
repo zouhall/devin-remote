@@ -1,0 +1,74 @@
+{
+  "name": "devin-web-console",
+  "version": "0.1.0",
+  "description": "A Kimi-web-style browser console for the Devin CLI — chat, streaming, modes, models, usage, terminal and more, over the Agent Client Protocol (ACP).",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "devin-web-console": "bin/devin-web-console.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/src/index.ts",
+    "dev:web": "vite",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "smoke": "tsx scripts/smoke.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.web.json",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "devin",
+    "cognition",
+    "acp",
+    "agent-client-protocol",
+    "ai",
+    "coding-agent",
+    "web-ui"
+  ],
+  "author": "Skander Ben Hamda",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zouhall/devin-web-console.git"
+  },
+  "homepage": "https://github.com/zouhall/devin-web-console#readme",
+  "bugs": "https://github.com/zouhall/devin-web-console/issues",
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.2.1",
+    "fflate": "^0.8.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.7",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "concurrently": "^9.1.0",
+    "highlight.js": "^11.10.0",
+    "katex": "^0.16.11",
+    "mermaid": "^11.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "rehype-katex": "^7.0.1",
+    "rehype-highlight": "^7.0.1",
+    "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
