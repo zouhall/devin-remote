@@ -3,7 +3,10 @@ import type { SessionState } from "../state";
 import { setSessionConfig } from "../state";
 import type { ConfigOptionValue } from "../types";
 import { fuzzyScore } from "../utils";
-import { IconCheck, IconChevron, IconImage } from "../icons";
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { CheckIcon, ChevronDownIcon, ImageIcon, SearchIcon } from "lucide-react";
 
 interface ParsedModel {
   opt: ConfigOptionValue;
@@ -91,68 +94,90 @@ export default memo(function ModelPicker({ session }: { session: SessionState })
 
   return (
     <>
-      <button className="btn btn-sm" onClick={() => setOpen(true)} title="Pick a model">
-        <span className="mono" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
-          {currentModel?.name ?? current ?? "model"}
-        </span>
-        <IconChevron size={13} style={{ transform: "rotate(90deg)" }} />
+      <button
+        className="flex h-8 max-w-44 items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:scale-[0.97]"
+        onClick={() => setOpen(true)}
+        title="Pick a model"
+      >
+        <span className="tnum truncate font-mono">{currentModel?.name ?? current ?? "model"}</span>
+        <ChevronDownIcon className="size-3 flex-none" />
       </button>
-      {open && (
-        <div className="modal-overlay" onMouseDown={() => setOpen(false)}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              Model
-              <span className="spacer" />
-              <button className="icon-btn" onClick={() => setOpen(false)} aria-label="close">
-                ✕
-              </button>
-            </div>
-            <div className="model-search">
-              <input
-                className="text-input"
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xl p-0" hideClose={false}>
+          <DialogHeader>
+            <DialogTitle>Model</DialogTitle>
+          </DialogHeader>
+          <div className="border-b border-border p-3">
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
                 autoFocus
+                className="h-9 bg-background pl-8 text-sm"
                 placeholder="Filter models…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="model-list">
-              {groups.map((g) => (
-                <div key={g.family}>
-                  <div className="model-family">{g.label}</div>
-                  {g.models.map((m) => (
-                    <button
-                      key={m.opt.value}
-                      className={`model-item ${m.opt.value === current ? "current" : ""}`}
-                      title={m.opt.description ?? m.opt.value}
-                      onClick={() => {
-                        setOpen(false);
-                        if (m.opt.value !== current) void setSessionConfig(session.sessionId, "model", m.opt.value);
-                      }}
-                    >
-                      <span style={{ width: 16, flex: "none", display: "inline-flex" }}>
-                        {m.opt.value === current && <IconCheck size={14} />}
-                      </span>
-                      <span className="mi-name">{m.opt.name}</span>
-                      <span className="mi-badges">
-                        {m.adaptive && <span className="badge badge-accent">adaptive · recommended</span>}
-                        {m.thinking && <span className="badge">think {m.thinking}</span>}
-                        {m.speed && <span className="badge badge-yellow">{m.speed}</span>}
-                        {m.supportsImages && (
-                          <span className="badge badge-green" title="supports image input">
-                            <IconImage size={11} />
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-              {groups.length === 0 && <div className="palette-empty">No models match</div>}
-            </div>
           </div>
-        </div>
-      )}
+          <div className="max-h-[55vh] overflow-y-auto p-1.5">
+            {groups.map((g) => (
+              <div key={g.family} className="mb-1">
+                <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+                  {g.label}
+                </div>
+                {g.models.map((m) => (
+                  <button
+                    key={m.opt.value}
+                    title={m.opt.description ?? m.opt.value}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors duration-100",
+                      "hover:bg-accent active:scale-[0.99]",
+                      m.opt.value === current && "bg-accent/60",
+                    )}
+                    onClick={() => {
+                      setOpen(false);
+                      if (m.opt.value !== current) void setSessionConfig(session.sessionId, "model", m.opt.value);
+                    }}
+                  >
+                    <span className="flex w-4 flex-none justify-center">
+                      {m.opt.value === current && <CheckIcon className="size-3.5 text-primary" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{m.opt.name}</span>
+                    <span className="flex flex-none items-center gap-1">
+                      {m.adaptive && (
+                        <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          adaptive · recommended
+                        </span>
+                      )}
+                      {m.thinking && (
+                        <span className="tnum rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          think {m.thinking}
+                        </span>
+                      )}
+                      {m.speed && (
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                          {m.speed}
+                        </span>
+                      )}
+                      {m.supportsImages && (
+                        <span
+                          className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-400"
+                          title="supports image input"
+                        >
+                          <ImageIcon className="size-3" />
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            {groups.length === 0 && (
+              <div className="px-3 py-8 text-center text-sm text-muted-foreground">No models match</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 });

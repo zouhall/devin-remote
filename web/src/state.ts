@@ -394,7 +394,14 @@ function normalizeToolContent(items: ToolCallContent[] | undefined): ToolCallCon
 }
 
 export function applySessionUpdate(sessionId: string, update: SessionUpdate): void {
-  ensureSession({ sessionId, cwd: state.meta?.primaryCwd ?? "", title: null, alias: null, updatedAt: null });
+  // Don't clobber an existing session's cwd with the primary-cwd fallback.
+  ensureSession({
+    sessionId,
+    cwd: state.sessions[sessionId] ? "" : state.meta?.primaryCwd ?? "",
+    title: null,
+    alias: null,
+    updatedAt: null,
+  });
   updateSession(sessionId, (d) => {
     switch (update.sessionUpdate) {
       case "user_message_chunk":
@@ -426,6 +433,8 @@ export function applySessionUpdate(sessionId: string, update: SessionUpdate): vo
           locations: u.locations ?? existing?.locations,
           rawInput: u.rawInput ?? existing?.rawInput,
           rawOutput: existing?.rawOutput,
+          startedAt: existing?.startedAt ?? Date.now(),
+          finishedAt: existing?.finishedAt ?? null,
         };
         d.toolCalls = { ...d.toolCalls, [tc.id]: tc };
         if (!existing) d.timeline = [...d.timeline, { kind: "tool", id: tc.id }];
@@ -444,6 +453,8 @@ export function applySessionUpdate(sessionId: string, update: SessionUpdate): vo
             status: u.status ?? "in_progress",
             content: normalizeToolContent(u.content),
             rawOutput: u.rawOutput,
+            startedAt: Date.now(),
+            finishedAt: null,
           };
           d.toolCalls = { ...d.toolCalls, [tc.id]: tc };
           d.timeline = [...d.timeline, { kind: "tool", id: tc.id }];
@@ -455,6 +466,10 @@ export function applySessionUpdate(sessionId: string, update: SessionUpdate): vo
           status: u.status ?? existing.status,
           content: u.content ? [...existing.content, ...u.content] : existing.content,
           rawOutput: u.rawOutput ?? existing.rawOutput,
+          finishedAt:
+            (u.status === "completed" || u.status === "failed") && existing.finishedAt == null
+              ? Date.now()
+              : existing.finishedAt,
         };
         d.toolCalls = { ...d.toolCalls, [merged.id]: merged };
         if (u.content) registerTerminalsFromContent(sessionId, u.content);
@@ -668,6 +683,11 @@ export function showNotice(text: string): void {
   noticeTimer = setTimeout(() => setState({ notice: null }), 5000);
 }
 
+export function hideNotice(): void {
+  if (noticeTimer) clearTimeout(noticeTimer);
+  setState({ notice: null });
+}
+
 export function setUi(patch: Partial<AppState["ui"]>): void {
   setState({ ui: { ...state.ui, ...patch } });
 }
@@ -725,7 +745,7 @@ export function dispatchEvent(ev: WsServerEvent): void {
     case "permission_request": {
       ensureSession({
         sessionId: ev.sessionId,
-        cwd: state.meta?.primaryCwd ?? "",
+        cwd: state.sessions[ev.sessionId] ? "" : state.meta?.primaryCwd ?? "",
         title: null,
         alias: null,
         updatedAt: null,

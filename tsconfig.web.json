@@ -11,7 +11,11 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./web/src/*"]
+    }
   },
   "include": ["web/src/**/*.ts", "web/src/**/*.tsx", "vite.config.ts"]
 }

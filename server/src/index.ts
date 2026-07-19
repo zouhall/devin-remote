@@ -159,7 +159,18 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse, url: U
     file = path.join(webDir, "index.html"); // SPA fallback
   }
   const ext = path.extname(file).toLowerCase();
-  res.writeHead(200, { "content-type": STATIC_MIME[ext] ?? "application/octet-stream" });
+  const mime = STATIC_MIME[ext] ?? "application/octet-stream";
+
+  // Serve pre-compressed assets (scripts/compress.mjs) when the client accepts them.
+  const accept = String(req.headers["accept-encoding"] ?? "");
+  for (const [enc, suffix] of [["br", ".br"], ["gzip", ".gz"]] as const) {
+    if (accept.includes(enc) && fs.existsSync(file + suffix)) {
+      res.writeHead(200, { "content-type": mime, "content-encoding": enc });
+      fs.createReadStream(file + suffix).pipe(res);
+      return;
+    }
+  }
+  res.writeHead(200, { "content-type": mime });
   fs.createReadStream(file).pipe(res);
 }
 

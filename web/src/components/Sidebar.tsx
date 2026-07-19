@@ -10,25 +10,37 @@ import {
   useStore,
 } from "../state";
 import type { SessionState } from "../state";
-import { cx, fuzzyScore, relTime, truncate } from "../utils";
+import { fuzzyScore, relTime, truncate } from "../utils";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import {
-  IconChart,
-  IconCheck,
-  IconCopy,
-  IconDownload,
-  IconFolder,
-  IconLogo,
-  IconPencil,
-  IconPlus,
-  IconRefresh,
-  IconSearch,
-  IconSettings,
-  IconX,
-} from "../icons";
+  ChartColumnIcon,
+  CheckIcon,
+  CopyIcon,
+  DownloadIcon,
+  FolderIcon,
+  Loader2Icon,
+  PencilIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  SettingsIcon,
+  XIcon,
+} from "lucide-react";
 
 function sessionLabel(s: SessionState): string {
   return s.alias || s.title || `session ${s.sessionId.slice(0, 8)}`;
 }
+
+const LogoMark = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 32 32" className={className} aria-hidden>
+    <rect width="32" height="32" rx="7" className="fill-muted" />
+    <path d="M9 23V9h5.5a5.5 5.5 0 0 1 0 14z" fill="none" className="stroke-primary" strokeWidth="2.4" />
+  </svg>
+);
 
 export default function Sidebar() {
   const state = useStore();
@@ -87,77 +99,102 @@ export default function Sidebar() {
     if (title) await renameSession(id, title);
   };
 
+  const loadingList = state.sessionsLoading && groups.length === 0;
+
   return (
-    <aside className={cx("sidebar", state.ui.sidebarOpen && "open")}>
-      <div className="sidebar-header">
-        <div className="brand">
-          <IconLogo size={22} />
-          Devin Console
-          <span className="version">v{state.meta?.app.version ?? "…"}</span>
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-card/50 transition-transform duration-200 ease-out",
+        "md:static md:translate-x-0",
+        state.ui.sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full",
+      )}
+    >
+      <div className="flex h-13 flex-none items-center gap-2 border-b border-border px-3.5">
+        <LogoMark className="size-6 rounded-md" />
+        <span className="text-sm font-semibold tracking-[-0.01em]">Devin Console</span>
+        <span className="tnum font-mono text-[11px] text-muted-foreground">
+          v{state.meta?.app.version ?? "…"}
+        </span>
+      </div>
+
+      <div className="flex flex-none flex-col gap-2 border-b border-border p-3">
+        <div className="flex gap-1.5">
+          <Input
+            className="tnum h-8 flex-1 bg-background font-mono text-xs"
+            list="dc-workspaces"
+            placeholder={state.meta?.primaryCwd ?? "/path/to/workspace"}
+            value={cwdInput}
+            onChange={(e) => setCwdInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submitNew();
+            }}
+          />
+          <datalist id="dc-workspaces">
+            {workspaces.map((w) => (
+              <option key={w} value={w} />
+            ))}
+          </datalist>
+          <Button size="sm" className="h-8 gap-1" onClick={() => void submitNew()} disabled={creating}>
+            {creating ? <Loader2Icon className="size-3.5 animate-spin" /> : <PlusIcon className="size-3.5" />}
+            New
+          </Button>
+        </div>
+        <div className="relative">
+          <SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-8 bg-background pl-8 text-xs"
+            placeholder="Filter sessions…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
         </div>
       </div>
 
-      <div className="new-session">
-        <input
-          className="text-input mono"
-          list="dc-workspaces"
-          placeholder={state.meta?.primaryCwd ?? "/path/to/workspace"}
-          value={cwdInput}
-          onChange={(e) => setCwdInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void submitNew();
-          }}
-        />
-        <datalist id="dc-workspaces">
-          {workspaces.map((w) => (
-            <option key={w} value={w} />
-          ))}
-        </datalist>
-        <button className="btn btn-primary" onClick={() => void submitNew()} disabled={creating}>
-          <IconPlus size={14} /> {creating ? "Creating…" : "New Session"}
-        </button>
-      </div>
-
-      <div className="sidebar-search">
-        <input
-          className="text-input"
-          placeholder="Filter sessions…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </div>
-
-      <div className="session-list">
-        {!state.sessionsLoaded && !state.sessionsLoading && groups.length === 0 && (
-          <div className="loading-row">No sessions yet</div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {loadingList && (
+          <div className="flex flex-col gap-2 p-1.5" aria-label="Loading sessions">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Skeleton key={i} className="dc-shimmer h-12 rounded-lg" />
+            ))}
+          </div>
         )}
-        {state.sessionsLoading && groups.length === 0 && (
-          <div className="loading-row">
-            <span className="spinner" /> Loading sessions…
+        {!loadingList && groups.length === 0 && (
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+            {state.sessionsLoaded ? "No sessions yet — create one above." : "No sessions yet"}
           </div>
         )}
         {groups.map(([cwd, list]) => (
-          <div key={cwd} className="session-group">
-            <div className="session-group-label" title={cwd}>
-              <IconFolder size={12} />
-              <span className="mono">{cwd}</span>
+          <div key={cwd} className="mb-1">
+            <div
+              className="flex items-center gap-1.5 px-2 pb-1 pt-2 text-[11px] text-muted-foreground"
+              title={cwd}
+            >
+              <FolderIcon className="size-3 flex-none" />
+              <span className="tnum truncate font-mono">{cwd}</span>
             </div>
-            {list.map((s) => (
+            {list.map((s, i) => (
               <div
                 key={s.sessionId}
-                className={cx("session-item", s.sessionId === state.activeSessionId && "active")}
                 role="button"
                 tabIndex={0}
+                style={{ animationDelay: `${Math.min(i * 25, 200)}ms` }}
+                className={cn(
+                  "group relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 transition-colors duration-150",
+                  "hover:bg-accent/60 active:scale-[0.99]",
+                  s.sessionId === state.activeSessionId && "bg-accent",
+                )}
                 onClick={() => renamingId !== s.sessionId && selectSession(s.sessionId)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") selectSession(s.sessionId);
                 }}
               >
-                {s.running && <span className="activity-dot" title="streaming" />}
+                {s.running && (
+                  <span className="absolute left-0.5 top-1/2 size-1.5 -translate-y-1/2 animate-pulse rounded-full bg-primary" />
+                )}
                 {renamingId === s.sessionId ? (
-                  <>
-                    <input
-                      className="rename-input"
+                  <div className="flex min-w-0 flex-1 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      className="h-7 flex-1 bg-background px-1.5 text-xs"
                       autoFocus
                       value={renameText}
                       onChange={(e) => setRenameText(e.target.value)}
@@ -165,71 +202,73 @@ export default function Sidebar() {
                         if (e.key === "Enter") void commitRename(s.sessionId);
                         if (e.key === "Escape") setRenamingId(null);
                       }}
-                      onClick={(e) => e.stopPropagation()}
                     />
-                    <span className="si-actions" style={{ display: "flex" }}>
-                      <button
-                        className="icon-btn"
-                        title="Save"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void commitRename(s.sessionId);
-                        }}
-                      >
-                        <IconCheck size={13} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        title="Cancel"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRenamingId(null);
-                        }}
-                      >
-                        <IconX size={13} />
-                      </button>
-                    </span>
-                  </>
+                    <TooltipIconButton
+                      tooltip="Save"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => void commitRename(s.sessionId)}
+                    >
+                      <CheckIcon className="size-3.5" />
+                    </TooltipIconButton>
+                    <TooltipIconButton
+                      tooltip="Cancel"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setRenamingId(null)}
+                    >
+                      <XIcon className="size-3.5" />
+                    </TooltipIconButton>
+                  </div>
                 ) : (
                   <>
-                    <span className="si-main">
-                      <span className="si-title" title={sessionLabel(s)}>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium leading-tight" title={sessionLabel(s)}>
                         {truncate(sessionLabel(s), 60)}
-                      </span>
-                      <span className="si-sub">
-                        <span className="mono">{s.sessionId.slice(0, 8)}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span className="tnum font-mono">{s.sessionId.slice(0, 8)}</span>
                         {s.updatedAt && (
                           <>
-                            · <span>{relTime(s.updatedAt)}</span>
+                            <span>·</span>
+                            <span>{relTime(s.updatedAt)}</span>
                           </>
                         )}
-                      </span>
-                    </span>
-                    <span className="si-actions">
-                      <button
-                        className="icon-btn"
-                        title="Rename"
+                      </div>
+                    </div>
+                    <div className="flex flex-none items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                      <TooltipIconButton
+                        tooltip="Rename"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
                         onClick={(e) => {
                           e.stopPropagation();
                           setRenamingId(s.sessionId);
                           setRenameText(sessionLabel(s));
                         }}
                       >
-                        <IconPencil size={13} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        title="Export zip"
+                        <PencilIcon className="size-3.5" />
+                      </TooltipIconButton>
+                      <TooltipIconButton
+                        tooltip="Export zip"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
                         onClick={(e) => {
                           e.stopPropagation();
                           window.open(api.exportUrl(s.sessionId), "_blank");
                         }}
                       >
-                        <IconDownload size={13} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        title="Copy session id"
+                        <DownloadIcon className="size-3.5" />
+                      </TooltipIconButton>
+                      <TooltipIconButton
+                        tooltip="Copy session id"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
                         onClick={(e) => {
                           e.stopPropagation();
                           void navigator.clipboard
@@ -238,9 +277,9 @@ export default function Sidebar() {
                             .catch(() => showNotice("copy failed"));
                         }}
                       >
-                        <IconCopy size={13} />
-                      </button>
-                    </span>
+                        <CopyIcon className="size-3.5" />
+                      </TooltipIconButton>
+                    </div>
                   </>
                 )}
               </div>
@@ -249,27 +288,59 @@ export default function Sidebar() {
         ))}
       </div>
 
-      <div className="sidebar-footer">
-        <span className={cx("conn-dot", !state.wsConnected && "off")} title={state.wsConnected ? "connected" : "disconnected"} />
-        <span>{state.wsConnected ? "connected" : "reconnecting…"}</span>
-        <span className="spacer" />
-        <button
-          className="icon-btn"
-          title="Refresh sessions"
+      <div className="flex h-11 flex-none items-center gap-1.5 border-t border-border px-3">
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            state.wsConnected ? "bg-emerald-500" : "animate-pulse bg-red-500",
+          )}
+          title={state.wsConnected ? "connected" : "disconnected"}
+        />
+        <span className="text-[11px] text-muted-foreground">
+          {state.wsConnected ? "connected" : "reconnecting…"}
+        </span>
+        <span className="flex-1" />
+        <TooltipIconButton
+          tooltip="Refresh sessions"
+          variant="ghost"
+          size="icon"
+          className="size-8"
           onClick={() => void refreshSessions()}
           disabled={state.sessionsLoading}
         >
-          {state.sessionsLoading ? <span className="spinner" /> : <IconRefresh size={15} />}
-        </button>
-        <button className="icon-btn" title="Usage" onClick={() => setUi({ modal: "usage" })}>
-          <IconChart size={15} />
-        </button>
-        <button className="icon-btn" title="Search (Ctrl+K)" onClick={() => setUi({ modal: "palette" })}>
-          <IconSearch size={15} />
-        </button>
-        <button className="icon-btn" title="Settings" onClick={() => setUi({ modal: "settings" })}>
-          <IconSettings size={15} />
-        </button>
+          {state.sessionsLoading ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <RefreshCwIcon className="size-4" />
+          )}
+        </TooltipIconButton>
+        <TooltipIconButton
+          tooltip="Usage"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={() => setUi({ modal: "usage" })}
+        >
+          <ChartColumnIcon className="size-4" />
+        </TooltipIconButton>
+        <TooltipIconButton
+          tooltip="Search (Ctrl+K)"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={() => setUi({ modal: "palette" })}
+        >
+          <SearchIcon className="size-4" />
+        </TooltipIconButton>
+        <TooltipIconButton
+          tooltip="Settings"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={() => setUi({ modal: "settings" })}
+        >
+          <SettingsIcon className="size-4" />
+        </TooltipIconButton>
       </div>
     </aside>
   );

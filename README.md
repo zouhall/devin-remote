@@ -101,7 +101,8 @@ npm run smoke      # end-to-end ACP smoke test against your devin CLI
 ```
 
 Stack: Node + TypeScript server (`@agentclientprotocol/sdk`, `ws`, `fflate`),
-React + Vite frontend (react-markdown, KaTeX, Mermaid, xterm.js).
+React + Vite frontend ([assistant-ui](https://www.assistant-ui.com/), Tailwind
+v4, KaTeX, Mermaid, xterm.js).
 
 ## Roadmap
 

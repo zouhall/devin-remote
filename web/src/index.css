@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Devin Console design tokens.
+ * Dark-first: warm-neutral zinc surfaces, single amber accent (no AI-purple).
+ */
+:root {
+  --background: 240 6% 6%;
+  --foreground: 240 5% 96%;
+  --card: 240 6% 8%;
+  --card-foreground: 240 5% 96%;
+  --popover: 240 6% 7%;
+  --popover-foreground: 240 5% 96%;
+  --primary: 32 78% 56%;
+  --primary-foreground: 30 50% 8%;
+  --secondary: 240 5% 14%;
+  --secondary-foreground: 240 5% 92%;
+  --muted: 240 5% 13%;
+  --muted-foreground: 240 4% 62%;
+  --accent: 240 5% 15%;
+  --accent-foreground: 240 5% 96%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 4% 15%;
+  --input: 240 4% 20%;
+  --ring: 32 78% 56%;
+  --radius: 0.625rem;
+}
+
+.light {
+  --background: 30 10% 98%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --primary: 30 80% 42%;
+  --primary-foreground: 30 40% 98%;
+  --secondary: 30 8% 94%;
+  --secondary-foreground: 240 6% 12%;
+  --muted: 30 8% 93%;
+  --muted-foreground: 240 4% 42%;
+  --accent: 30 8% 92%;
+  --accent-foreground: 240 6% 12%;
+  --destructive: 0 68% 44%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 30 8% 87%;
+  --input: 30 8% 82%;
+  --ring: 30 80% 42%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Quiet, theme-aware scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.25);
+}
+
+/* Skeleton shimmer for the boot splash */
+@keyframes dc-shimmer {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+.dc-shimmer {
+  animation: dc-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Numbers and stats always tabular */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

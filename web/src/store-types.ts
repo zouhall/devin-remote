@@ -38,6 +38,9 @@ export interface ToolCallState {
   locations?: ToolCallLocation[];
   rawInput?: unknown;
   rawOutput?: unknown;
+  /** Client-side wall-clock timing, for the duration badge on tool cards. */
+  startedAt: number;
+  finishedAt: number | null;
 }
 
 export type TimelineItem = { kind: "message" | "tool"; id: string };

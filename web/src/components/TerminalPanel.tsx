@@ -1,26 +1,30 @@
+import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { getTerminalOutput, setUi, useStore } from "../state";
-import { IconTerminal, IconX } from "../icons";
+import { cn } from "@/lib/utils";
+import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import { SquareTerminalIcon, XIcon } from "lucide-react";
 
+// Matched to the design tokens (dark zinc surfaces, amber accent cursor).
 const XTERM_THEME = {
-  background: "#0b0b0f",
-  foreground: "#d6d6de",
-  cursor: "#6ea8fe",
-  selectionBackground: "#2a3a55",
-  black: "#1c1c24",
+  background: "#131316",
+  foreground: "#e4e4e7",
+  cursor: "#e29a3c",
+  selectionBackground: "#3b3b42",
+  black: "#1c1c21",
   red: "#f87171",
   green: "#4ade80",
-  yellow: "#facc15",
-  blue: "#6ea8fe",
-  magenta: "#a78bfa",
+  yellow: "#e29a3c",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
   cyan: "#22d3ee",
   white: "#e8e8ee",
   brightBlack: "#55555f",
   brightRed: "#fca5a5",
   brightGreen: "#86efac",
-  brightYellow: "#fde047",
+  brightYellow: "#f5c97b",
   brightBlue: "#93c5fd",
   brightMagenta: "#c4b5fd",
   brightCyan: "#67e8f9",
@@ -38,7 +42,7 @@ function XTermView({ id, version, resetSeq }: { id: string; version: number; res
     if (!host) return;
     const term = new Terminal({
       fontSize: 12,
-      fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+      fontFamily: '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace',
       theme: XTERM_THEME,
       scrollback: 10000,
       disableStdin: true,
@@ -87,7 +91,7 @@ function XTermView({ id, version, resetSeq }: { id: string; version: number; res
     }
   }, [id, version, resetSeq]);
 
-  return <div className="xterm-host" ref={hostRef} />;
+  return <div className="min-h-0 flex-1 px-2 py-1.5 [&_.xterm]:h-full" ref={hostRef} />;
 }
 
 export default function TerminalPanel() {
@@ -103,34 +107,58 @@ export default function TerminalPanel() {
     null;
 
   return (
-    <div className="drawer">
-      <div className="drawer-head">
-        <IconTerminal size={14} />
-        <div className="term-tabs">
+    <div className="flex h-64 flex-none flex-col border-t border-border bg-card/40">
+      <div className="flex h-10 flex-none items-center gap-2 border-b border-border px-3">
+        <SquareTerminalIcon className="size-3.5 text-muted-foreground" />
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {shown.map((t) => (
             <button
               key={t.id}
-              className={`term-tab ${selected?.id === t.id ? "active" : ""}`}
+              className={cn(
+                "tnum flex flex-none items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[11px] transition-colors duration-100",
+                selected?.id === t.id
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+              )}
               onClick={() => setUi({ activeTerminalId: t.id })}
             >
               {t.id.slice(0, 8)}
               {t.exitCode !== null && (
-                <span className={`badge ${t.exitCode === 0 ? "badge-green" : "badge-red"}`}>
+                <span
+                  className={cn(
+                    "rounded px-1 py-0.5 text-[10px] font-medium",
+                    t.exitCode === 0
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      : "bg-red-500/15 text-red-600 dark:text-red-400",
+                  )}
+                >
                   exit {t.exitCode}
                 </span>
               )}
             </button>
           ))}
-          {shown.length === 0 && <span className="hint">No terminals yet — they appear when Devin runs commands.</span>}
+          {shown.length === 0 && (
+            <span className="font-sans text-xs text-muted-foreground">
+              No terminals yet — they appear when Devin runs commands.
+            </span>
+          )}
         </div>
-        <span className="spacer" />
-        <button className="icon-btn" aria-label="close terminals" onClick={() => setUi({ terminalOpen: false })}>
-          <IconX size={15} />
-        </button>
+        <TooltipIconButton
+          tooltip="Close terminals"
+          variant="ghost"
+          size="icon"
+          className="size-7 flex-none"
+          aria-label="close terminals"
+          onClick={() => setUi({ terminalOpen: false })}
+        >
+          <XIcon className="size-3.5" />
+        </TooltipIconButton>
       </div>
-      <div className="drawer-body">
-        {selected && <XTermView id={selected.id} version={selected.version} resetSeq={selected.resetSeq} />}
-      </div>
+      {selected ? (
+        <XTermView id={selected.id} version={selected.version} resetSeq={selected.resetSeq} />
+      ) : (
+        <div className="flex-1" />
+      )}
     </div>
   );
 }

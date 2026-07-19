@@ -1,26 +1,54 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#101014" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23101014'/%3E%3Cpath d='M10 9h6a7 7 0 0 1 0 14h-6z' fill='none' stroke='%236ea8fe' stroke-width='2.4'/%3E%3C/svg%3E"
-    />
+    <meta name="description" content="Devin Console — a browser console for the Devin CLI over ACP" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0f'/%3E%3Cpath d='M9 23V9h5.5a5.5 5.5 0 0 1 0 14z' fill='none' stroke='%23e29a3c' stroke-width='2.4'/%3E%3C/svg%3E" />
     <title>Devin Console</title>
     <style>
-      /* Pre-paint background so there is no white flash before the bundle loads. */
-      html,
-      body {
-        margin: 0;
-        background: #101014;
-        color: #e4e4ea;
+      /* Boot splash — replaced by React on mount */
+      html { background: #0c0c0f; }
+      #dc-boot {
+        position: fixed; inset: 0; display: flex; background: #0c0c0f;
+        font-family: ui-sans-serif, system-ui, sans-serif;
       }
+      #dc-boot .side {
+        width: 280px; border-right: 1px solid #1c1c21; padding: 16px;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      #dc-boot .main { flex: 1; display: flex; flex-direction: column; }
+      #dc-boot .bar { height: 52px; border-bottom: 1px solid #1c1c21; }
+      #dc-boot .chat { flex: 1; display: flex; align-items: center; justify-content: center; }
+      #dc-boot .sk {
+        background: #17171b; border-radius: 8px;
+        animation: dcsk 1.6s ease-in-out infinite;
+      }
+      @keyframes dcsk { 0%,100% { opacity: .45 } 50% { opacity: 1 } }
+      #dc-boot .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+      #dc-boot .logo-text { color: #f4f4f5; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+      @media (max-width: 768px) { #dc-boot .side { display: none; } }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="dc-boot">
+        <div class="side">
+          <div class="logo">
+            <svg width="22" height="22" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#17171b"/><path d="M9 23V9h5.5a5.5 5.5 0 0 1 0 14z" fill="none" stroke="#e29a3c" stroke-width="2.4"/></svg>
+            <span class="logo-text">Devin Console</span>
+          </div>
+          <div class="sk" style="height: 34px"></div>
+          <div class="sk" style="height: 22px; width: 70%"></div>
+          <div class="sk" style="height: 22px; width: 85%"></div>
+          <div class="sk" style="height: 22px; width: 60%"></div>
+        </div>
+        <div class="main">
+          <div class="bar"></div>
+          <div class="chat"><div class="sk" style="width: 220px; height: 18px"></div></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

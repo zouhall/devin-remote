@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { injectIntoComposer, selectSession, setUi, useStore } from "../state";
 import type { SessionState } from "../state";
 import { fuzzyScore, truncate } from "../utils";
-import { IconCommand, IconSession } from "../icons";
+import { cn } from "@/lib/utils";
+import { SquareSlashIcon, MessageSquareIcon } from "lucide-react";
 
 interface Item {
   key: string;
@@ -39,9 +40,7 @@ export default function CommandPalette() {
       }
     }
     out.sort((a, b) => {
-      const sa = Math.min(
-        ...[a.label, a.sub].map((t) => fuzzyScore(query, t) ?? Infinity),
-      );
+      const sa = Math.min(...[a.label, a.sub].map((t) => fuzzyScore(query, t) ?? Infinity));
       const sb = Math.min(...[b.label, b.sub].map((t) => fuzzyScore(query, t) ?? Infinity));
       return sa - sb;
     });
@@ -64,7 +63,7 @@ export default function CommandPalette() {
   useEffect(() => setIndex(0), [query]);
 
   useEffect(() => {
-    const el = listRef.current?.querySelector(".palette-item.active");
+    const el = listRef.current?.querySelector("[data-active='true']");
     el?.scrollIntoView({ block: "nearest" });
   }, [index]);
 
@@ -79,11 +78,38 @@ export default function CommandPalette() {
     close();
   };
 
+  const renderItem = (item: Item) => (
+    <button
+      key={item.key}
+      data-active={items[index] === item || undefined}
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
+        items[index] === item ? "bg-accent" : "hover:bg-accent/50",
+      )}
+      onMouseEnter={() => setIndex(items.indexOf(item))}
+      onClick={() => choose(item)}
+    >
+      <span className="flex size-7 flex-none items-center justify-center rounded-md border border-border bg-muted/50 text-muted-foreground">
+        {item.kind === "command" ? <SquareSlashIcon className="size-3.5" /> : <MessageSquareIcon className="size-3.5" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{item.label}</span>
+        {item.sub && <span className="tnum block truncate font-mono text-[11px] text-muted-foreground">{item.sub}</span>}
+      </span>
+    </button>
+  );
+
   return (
-    <div className="modal-overlay" onMouseDown={close}>
-      <div className="modal palette" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-[12vh] backdrop-blur-[2px]"
+      onMouseDown={close}
+    >
+      <div
+        className="flex max-h-[60vh] w-[calc(100vw-2rem)] max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <input
-          className="palette-input"
+          className="h-12 flex-none border-b border-border bg-transparent px-4 text-[15px] outline-none placeholder:text-muted-foreground/70"
           autoFocus
           placeholder="Jump to a session, or type a /command…"
           value={query}
@@ -100,42 +126,18 @@ export default function CommandPalette() {
             }
           }}
         />
-        <div className="palette-list" ref={listRef}>
-          {items.length === 0 && <div className="palette-empty">No matches</div>}
-          {items.some((i) => i.kind === "command") && <div className="palette-section">Commands</div>}
-          {items
-            .filter((i) => i.kind === "command")
-            .map((item) => (
-              <button
-                key={item.key}
-                className={`palette-item ${items[index] === item ? "active" : ""}`}
-                onMouseEnter={() => setIndex(items.indexOf(item))}
-                onClick={() => choose(item)}
-              >
-                <span className="pi-icon">
-                  <IconCommand size={14} />
-                </span>
-                <span className="pi-main">{item.label}</span>
-                <span className="pi-sub">{item.sub}</span>
-              </button>
-            ))}
-          {items.some((i) => i.kind === "session") && <div className="palette-section">Sessions</div>}
-          {items
-            .filter((i) => i.kind === "session")
-            .map((item) => (
-              <button
-                key={item.key}
-                className={`palette-item ${items[index] === item ? "active" : ""}`}
-                onMouseEnter={() => setIndex(items.indexOf(item))}
-                onClick={() => choose(item)}
-              >
-                <span className="pi-icon">
-                  <IconSession size={14} />
-                </span>
-                <span className="pi-main">{item.label}</span>
-                <span className="pi-sub">{item.sub}</span>
-              </button>
-            ))}
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5" ref={listRef}>
+          {items.length === 0 && (
+            <div className="px-3 py-8 text-center text-sm text-muted-foreground">No matches</div>
+          )}
+          {items.some((i) => i.kind === "command") && (
+            <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">Commands</div>
+          )}
+          {items.filter((i) => i.kind === "command").map(renderItem)}
+          {items.some((i) => i.kind === "session") && (
+            <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">Sessions</div>
+          )}
+          {items.filter((i) => i.kind === "session").map(renderItem)}
         </div>
       </div>
     </div>
