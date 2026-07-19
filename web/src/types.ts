@@ -1,4 +1,4 @@
-// Protocol types for devin-console — mirror of the server contract (REST + WS + ACP).
+// Protocol types for devin-remote — mirror of the server contract (REST + WS + ACP).
 
 export type ThemeName = "dark" | "light" | "system";
 

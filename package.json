@@ -1,11 +1,11 @@
 {
-  "name": "devin-web-console",
-  "version": "0.2.0",
+  "name": "devin-remote",
+  "version": "0.3.0",
   "description": "A Kimi-web-style browser console for the Devin CLI — chat, streaming, modes, models, usage, terminal and more, over the Agent Client Protocol (ACP).",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "devin-web-console": "bin/devin-web-console.js"
+    "devin-remote": "bin/devin-remote.js"
   },
   "files": [
     "bin",
@@ -38,10 +38,10 @@
   "author": "Skander Ben Hamda",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zouhall/devin-web-console.git"
+    "url": "git+https://github.com/zouhall/devin-remote.git"
   },
-  "homepage": "https://github.com/zouhall/devin-web-console#readme",
-  "bugs": "https://github.com/zouhall/devin-web-console/issues",
+  "homepage": "https://github.com/zouhall/devin-remote#readme",
+  "bugs": "https://github.com/zouhall/devin-remote/issues",
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",
     "@assistant-ui/react": "^0.14.27",

@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for helping build Devin Console!
+Thanks for helping build Devin Remote!
 
 ## Setup
 
 ```bash
-git clone https://github.com/zouhall/devin-web-console.git
-cd devin-web-console
+git clone https://github.com/zouhall/devin-remote.git
+cd devin-remote
 npm install
 npm run dev
 ```
@@ -25,7 +25,7 @@ You need the [Devin CLI](https://docs.devin.ai/cli) installed and logged in
 ## Guidelines
 
 - Keep the server dependency-light and free of native modules — `npx
-  devin-web-console` must install cleanly everywhere.
+  devin-remote` must install cleanly everywhere.
 - ACP protocol shapes live in `server/src/acp.ts` and `web/src/types.ts`; keep
   them in sync when the protocol surface changes.
 - Test against a real Devin CLI before submitting; mocked ACP tests alone
@@ -34,5 +34,5 @@ You need the [Devin CLI](https://docs.devin.ai/cli) installed and logged in
 
 ## Reporting issues
 
-Include: `devin version`, `devin-web-console --version`, OS, and the browser
+Include: `devin version`, `devin-remote --version`, OS, and the browser
 console / server logs if the problem is visible there.

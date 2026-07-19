@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+Renamed to **Devin Remote** and redesigned to reproduce Devin's own visual language.
+
+- Renamed: package/bin/repo `devin-remote`, data dir `~/.devin-remote` (auto-migrates from `~/.devin-console`), env `DEVIN_REMOTE_HOME`
+- Light-first Devin theme: warm cream canvas, white cards, Devin blue accent; dark mode keeps the same palette DNA
+- Devin bowtie logo (two hexagons) across sidebar, home, favicon and boot splash
+- Devin Local-style composer: rounded-2xl card, mode chip, model name, dark circular send; cwd picker row underneath
+- New home screen: centered mark, recent sessions card, quick actions
+- Slimmer chat header with segmented mode pill; amber accent removed everywhere
+
 ## 0.2.0
 
 Full frontend rebuild on [assistant-ui](https://www.assistant-ui.com/) + Tailwind v4.

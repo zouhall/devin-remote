@@ -14,14 +14,14 @@ const UsagePanel = lazy(() => import("./components/UsagePanel"));
 const CommandPalette = lazy(() => import("./components/CommandPalette"));
 
 function applyTheme(theme: "dark" | "light" | "system"): void {
+  // Light is the default; dark is opt-in via the .dark class.
   const resolved =
     theme === "system"
-      ? window.matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
       : theme;
-  document.documentElement.classList.toggle("light", resolved === "light");
-  document.documentElement.classList.add("dark");
+  document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 
 export default function App() {
@@ -36,9 +36,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    applyTheme(state.settings.theme ?? "dark");
+    applyTheme(state.settings.theme ?? "light");
     if (state.settings.theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => applyTheme("system");
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);

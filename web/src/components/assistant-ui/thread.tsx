@@ -1,6 +1,6 @@
 "use client";
 
-// Devin Console thread — built on assistant-ui primitives, fed by our ACP
+// Devin Remote thread — built on assistant-ui primitives, fed by our ACP
 // session store via SessionRuntime. Plan/permissions/usage stay outside the
 // message flow as session-level panels.
 
@@ -12,13 +12,15 @@ import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { DevinToolFallback } from "@/components/DevinToolFallback";
+import { DevinMark } from "@/components/DevinLogo";
 import { PermissionStack } from "@/components/PermissionCard";
 import { PlanPanel } from "@/components/PlanPanel";
+import { modeIcon } from "@/components/ModeSwitcher";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { api } from "@/api";
-import { showNotice, useStore } from "@/state";
+import { setSessionConfig, setUi, showNotice, useStore } from "@/state";
 import {
   ActionBarPrimitive,
   AuiIf,
@@ -33,7 +35,8 @@ import {
   ArrowUpIcon,
   CheckIcon,
   CopyIcon,
-  PaperclipIcon,
+  FolderIcon,
+  PlusIcon,
   SquareIcon,
 } from "lucide-react";
 import {
@@ -47,6 +50,13 @@ import {
 export const Thread: FC = () => {
   const isEmpty = useAuiState((s) => s.thread.messages.length === 0);
   const isLoading = useAuiState((s) => s.thread.isLoading);
+  // Belt-and-braces: if our store already has timeline items but the runtime
+  // hasn't caught up, show the skeleton — never a wrong "new session" hero.
+  const state = useStore();
+  const active = state.activeSessionId ? state.sessions[state.activeSessionId] : null;
+  const storeEmpty = !active || active.timeline.length === 0;
+  const showSkeleton = isEmpty && (isLoading || !storeEmpty);
+  const showHero = isEmpty && !isLoading && storeEmpty;
 
   return (
     <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col bg-background">
@@ -54,11 +64,11 @@ export const Thread: FC = () => {
         <div
           className={cn(
             "mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pt-6",
-            isEmpty && !isLoading && "justify-center",
+            showHero && "justify-center",
           )}
         >
-          {isLoading && isEmpty && <HistorySkeleton />}
-          {!isLoading && isEmpty && <WelcomeHero />}
+          {showSkeleton && <HistorySkeleton />}
+          {showHero && <WelcomeHero />}
 
           <div className="flex flex-col gap-5 pb-10 empty:hidden">
             <ThreadPrimitive.Messages>
@@ -76,6 +86,7 @@ export const Thread: FC = () => {
             <PlanPanel />
             <PermissionStack />
             <Composer />
+            {showHero && <SuggestionChips />}
           </ThreadPrimitive.ViewportFooter>
         </div>
       </ThreadPrimitive.Viewport>
@@ -120,45 +131,30 @@ const SUGGESTIONS = [
   "Review @README.md and suggest three concrete improvements",
 ];
 
-const LogoMark: FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 32 32" className={className} aria-hidden>
-    <rect width="32" height="32" rx="7" className="fill-muted" />
-    <path
-      d="M9 23V9h5.5a5.5 5.5 0 0 1 0 14z"
-      fill="none"
-      className="stroke-primary"
-      strokeWidth="2.4"
-    />
-  </svg>
-);
-
 const WelcomeHero: FC = () => {
+  return (
+    <div className="mb-6 flex flex-col items-center px-4">
+      <DevinMark size={72} className="text-muted-foreground/25" />
+    </div>
+  );
+};
+
+const SuggestionChips: FC = () => {
   const composer = useComposerRuntime();
   return (
-    <div className="mb-8 flex flex-col items-center gap-4 px-4 text-center">
-      <LogoMark className="size-14 rounded-2xl shadow-lg" />
-      <div>
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground">
-          What should Devin work on?
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Attach screenshots, reference files with @path, or pick a starting point.
-        </p>
-      </div>
-      <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            className="max-w-full truncate rounded-full border border-border/70 bg-card px-3.5 py-1.5 text-sm text-foreground/90 transition-all duration-150 hover:border-border hover:bg-accent active:scale-[0.98]"
-            onClick={() => {
-              composer.setText(s);
-              composer.send();
-            }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-wrap items-center justify-center gap-2 px-2 pt-1">
+      {SUGGESTIONS.map((s) => (
+        <button
+          key={s}
+          className="max-w-full truncate rounded-full bg-secondary px-3.5 py-1.5 text-[13px] text-secondary-foreground transition-all duration-150 hover:bg-accent active:scale-[0.98]"
+          onClick={() => {
+            composer.setText(s);
+            composer.send();
+          }}
+        >
+          {s}
+        </button>
+      ))}
     </div>
   );
 };
@@ -194,12 +190,31 @@ async function uploadImage(file: File): Promise<{
 const Composer: FC = () => {
   const composer = useComposerRuntime();
   const state = useStore();
+  const isEmpty = useAuiState((s) => s.thread.messages.length === 0);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const session = state.activeSessionId ? state.sessions[state.activeSessionId] : null;
+  const modeOpt = session?.configOptions.find((o) => o.category === "mode");
+  const currentMode = session ? (session.currentModeId ?? modeOpt?.currentValue ?? "") : "";
+  const currentModeOpt = modeOpt?.options.find((o) => o.value === currentMode);
+  const modelOpt = session?.configOptions.find((o) => o.category === "model");
+  const currentModel = modelOpt?.options.find((o) => o.value === modelOpt.currentValue);
+
+  const cycleMode = () => {
+    if (!session || !modeOpt || modeOpt.options.length === 0) return;
+    const idx = modeOpt.options.findIndex((o) => o.value === currentMode);
+    const next = modeOpt.options[(idx + 1) % modeOpt.options.length];
+    void setSessionConfig(session.sessionId, "mode", next.value);
+  };
+
+  const focusCwdPicker = () => {
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (!isDesktop) setUi({ sidebarOpen: true });
+    setTimeout(() => document.getElementById("dc-cwd-input")?.focus(), 50);
+  };
 
   const addFiles = useCallback(
     async (files: Iterable<File>) => {
@@ -267,9 +282,9 @@ const Composer: FC = () => {
       <div
         data-dragging={dragging || undefined}
         className={cn(
-          "flex w-full flex-col gap-1 rounded-2xl border border-border bg-card p-2",
-          "shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)] transition-[border-color,box-shadow] duration-150",
-          "focus-within:border-ring/50",
+          "flex w-full flex-col gap-1 rounded-2xl border border-border bg-card p-3",
+          "shadow-[0_1px_3px_rgba(0,0,0,0.05),0_8px_24px_-16px_rgba(0,0,0,0.12)] transition-[border-color,box-shadow] duration-150",
+          "focus-within:border-muted-foreground/30",
           dragging && "border-dashed border-ring bg-accent/50",
         )}
       >
@@ -279,9 +294,11 @@ const Composer: FC = () => {
           placeholder={
             dragging
               ? "Drop images to attach…"
-              : "Message Devin… (Enter to send, Shift+Enter for newline, @path to link files)"
+              : isEmpty
+                ? "Ask Devin to build features, fix bugs, or work on your code"
+                : "Message Devin… (Enter to send, Shift+Enter for newline, @path to link files)"
           }
-          className="caret-primary placeholder:text-muted-foreground/70 max-h-40 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-[15px] leading-relaxed outline-none"
+          className="caret-primary placeholder:text-muted-foreground/70 max-h-40 min-h-12 w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-relaxed outline-none"
           rows={1}
           autoFocus
           enterKeyHint="send"
@@ -294,7 +311,7 @@ const Composer: FC = () => {
             }
           }}
         />
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <input
             ref={fileRef}
             type="file"
@@ -310,56 +327,82 @@ const Composer: FC = () => {
             tooltip="Attach images"
             side="top"
             type="button"
-            variant="ghost"
             size="icon"
-            className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+            className="size-9 flex-none rounded-full bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-accent active:scale-95"
             onClick={() => fileRef.current?.click()}
           >
-            <PaperclipIcon className="size-4" />
+            <PlusIcon className="size-4.5" />
           </TooltipIconButton>
-          <div className="flex items-center gap-1.5">
-            <AuiIf condition={(s) => !s.thread.isRunning}>
-              <ComposerPrimitive.Send asChild>
-                <TooltipIconButton
-                  tooltip="Send message"
-                  side="top"
-                  type="button"
-                  variant="default"
-                  size="icon"
-                  className="size-8 rounded-full transition-transform active:scale-95"
-                  aria-label="Send message"
-                >
-                  <ArrowUpIcon className="size-4.5" />
-                </TooltipIconButton>
-              </ComposerPrimitive.Send>
-            </AuiIf>
-            <AuiIf condition={(s) => s.thread.isRunning}>
-              <ComposerPrimitive.Cancel asChild>
-                <Button
-                  type="button"
-                  variant="default"
-                  size="icon"
-                  className="size-8 rounded-full transition-transform active:scale-95"
-                  aria-label="Stop generating"
-                >
-                  <SquareIcon className="size-3.5 fill-current" />
-                </Button>
-              </ComposerPrimitive.Cancel>
-            </AuiIf>
-          </div>
+          {modeOpt && modeOpt.options.length > 0 && (
+            <button
+              type="button"
+              title={currentModeOpt?.description ?? "Switch mode"}
+              className="flex h-9 items-center gap-1.5 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground"
+              onClick={cycleMode}
+            >
+              {modeIcon(currentMode, currentModeOpt?._meta?.["cognition.ai/icon"], "size-4")}
+              <span className="hidden sm:inline">{currentModeOpt?.name ?? currentMode}</span>
+            </button>
+          )}
+          {modelOpt && modelOpt.options.length > 0 && (
+            <button
+              type="button"
+              title="Pick a model"
+              className="hidden h-9 max-w-48 items-center truncate rounded-full px-1 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground sm:flex"
+              onClick={() => setUi({ modelPickerOpen: true })}
+            >
+              <span className="truncate">{currentModel?.name ?? modelOpt.currentValue}</span>
+            </button>
+          )}
+          <span className="flex-1" />
+          <AuiIf condition={(s) => !s.thread.isRunning}>
+            <ComposerPrimitive.Send asChild>
+              <Button
+                type="button"
+                size="icon"
+                title="Send message"
+                className="size-9 flex-none rounded-full bg-foreground text-background shadow-none transition-all duration-150 hover:bg-foreground/85 hover:text-background active:scale-95 disabled:bg-muted disabled:text-muted-foreground"
+                aria-label="Send message"
+              >
+                <ArrowUpIcon className="size-4.5" />
+              </Button>
+            </ComposerPrimitive.Send>
+          </AuiIf>
+          <AuiIf condition={(s) => s.thread.isRunning}>
+            <ComposerPrimitive.Cancel asChild>
+              <Button
+                type="button"
+                size="icon"
+                title="Stop generating"
+                className="size-9 flex-none rounded-full bg-foreground text-background shadow-none transition-all duration-150 hover:bg-foreground/85 hover:text-background active:scale-95"
+                aria-label="Stop generating"
+              >
+                <SquareIcon className="size-3.5 fill-current" />
+              </Button>
+            </ComposerPrimitive.Cancel>
+          </AuiIf>
         </div>
       </div>
       {session && (
         <div className="flex items-center gap-3 px-2 text-[11px] text-muted-foreground/80">
-          <span className="tnum min-w-0 truncate font-mono" title={session.cwd}>
-            {session.cwd}
-          </span>
+          <button
+            type="button"
+            className="flex min-w-0 items-center gap-1.5 rounded transition-colors hover:text-foreground"
+            title="Change workspace directory"
+            onClick={focusCwdPicker}
+          >
+            <FolderIcon className="size-3 flex-none" />
+            <span className="tnum truncate font-mono">{session.cwd || "Select a directory…"}</span>
+          </button>
           <span className="flex-1" />
-          {session.availableCommands.length > 0 && (
-            <span className="hidden sm:inline">
-              {session.availableCommands.length} /commands · Ctrl+K
-            </span>
-          )}
+          <a
+            href="https://docs.devin.ai"
+            target="_blank"
+            rel="noreferrer"
+            className="transition-colors hover:text-primary"
+          >
+            Docs ↗
+          </a>
         </div>
       )}
     </ComposerPrimitive.Root>

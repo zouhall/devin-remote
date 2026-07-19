@@ -1,18 +1,27 @@
-import { lazy, Suspense } from "react";
-import { setUi, useStore } from "../state";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api";
+import { createSession, renameSession, selectSession, setUi, showNotice, useStore } from "../state";
 import type { SessionState } from "../state";
-import { formatTokens } from "../utils";
+import { formatTokens, relTime } from "../utils";
 import { cn } from "@/lib/utils";
 import ModeSwitcher from "./ModeSwitcher";
 import ModelPicker from "./ModelPicker";
+import { sessionLabel } from "./Sidebar";
+import { DevinMark } from "./DevinLogo";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   AlertTriangleIcon,
   ChartColumnIcon,
+  CheckIcon,
+  CopyIcon,
+  DownloadIcon,
   MenuIcon,
+  MessageSquareIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
   ScrollTextIcon,
-  SettingsIcon,
   SquareTerminalIcon,
 } from "lucide-react";
 
@@ -26,7 +35,7 @@ const Gauge = ({ usage }: { usage: { used: number; size: number } | null }) => {
       className="hidden items-center gap-1.5 md:flex"
       title={`Context window: ${usage.used.toLocaleString()} / ${usage.size.toLocaleString()} tokens (${pct}%)`}
     >
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-secondary">
         <span
           className={cn(
             "block h-full rounded-full transition-[width] duration-300",
@@ -42,40 +51,197 @@ const Gauge = ({ usage }: { usage: { used: number; size: number } | null }) => {
   );
 };
 
-const LogoMark = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 32 32" className={className} aria-hidden>
-    <rect width="32" height="32" rx="7" className="fill-muted" />
-    <path d="M9 23V9h5.5a5.5 5.5 0 0 1 0 14z" fill="none" className="stroke-primary" strokeWidth="2.4" />
-  </svg>
-);
+// ---- overflow menu (rename / export / copy id / usage) ---------------------
 
-const TIPS: Array<[string, string]> = [
-  ["Slash commands", "Press Ctrl+K to search sessions and insert agent commands like /review."],
-  ["Attach images", "Paste, drag & drop, or use the paperclip — screenshots go straight into the prompt."],
-  ["Reference files", "Type @path/to/file.ts in your message to link a workspace file."],
-  ["Modes & models", "Switch Code / Ask / Plan / Bypass and pick any model from the chat header."],
-];
+function OverflowMenu({ session }: { session: SessionState }) {
+  const [open, setOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameText, setRenameText] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
 
-function EmptyState() {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item =
+    "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-foreground transition-colors duration-100 hover:bg-accent";
+
+  return (
+    <div className="relative" ref={ref}>
+      <TooltipIconButton
+        tooltip="More"
+        variant="ghost"
+        size="icon"
+        className="size-9 text-muted-foreground"
+        aria-label="More actions"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <MoreHorizontalIcon className="size-4" />
+      </TooltipIconButton>
+      {open && (
+        <div className="absolute right-0 top-10 z-50 w-52 rounded-xl border border-border bg-popover p-1.5 shadow-lg">
+          {renaming ? (
+            <div className="flex items-center gap-1 p-1">
+              <Input
+                autoFocus
+                className="h-8 flex-1 bg-background px-2 text-xs"
+                value={renameText}
+                onChange={(e) => setRenameText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameText.trim()) {
+                    void renameSession(session.sessionId, renameText.trim());
+                    setRenaming(false);
+                    setOpen(false);
+                  }
+                  if (e.key === "Escape") setRenaming(false);
+                }}
+              />
+              <TooltipIconButton
+                tooltip="Save"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => {
+                  if (renameText.trim()) void renameSession(session.sessionId, renameText.trim());
+                  setRenaming(false);
+                  setOpen(false);
+                }}
+              >
+                <CheckIcon className="size-3.5" />
+              </TooltipIconButton>
+            </div>
+          ) : (
+            <button
+              className={item}
+              onClick={() => {
+                setRenameText(sessionLabel(session));
+                setRenaming(true);
+              }}
+            >
+              <PencilIcon className="size-3.5 text-muted-foreground" /> Rename session
+            </button>
+          )}
+          <button
+            className={item}
+            onClick={() => {
+              window.open(api.exportUrl(session.sessionId), "_blank");
+              setOpen(false);
+            }}
+          >
+            <DownloadIcon className="size-3.5 text-muted-foreground" /> Export zip
+          </button>
+          <button
+            className={item}
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(session.sessionId)
+                .then(() => showNotice("session id copied"))
+                .catch(() => showNotice("copy failed"));
+              setOpen(false);
+            }}
+          >
+            <CopyIcon className="size-3.5 text-muted-foreground" /> Copy session id
+          </button>
+          <button
+            className={item}
+            onClick={() => {
+              setUi({ modal: "usage" });
+              setOpen(false);
+            }}
+          >
+            <ChartColumnIcon className="size-3.5 text-muted-foreground" /> Usage
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- home (no session selected) ---------------------------------------------
+
+function Home() {
+  const state = useStore();
+  const recent = useMemo(
+    () =>
+      Object.values(state.sessions)
+        .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
+        .slice(0, 5),
+    [state.sessions],
+  );
+
+  const newSession = () => {
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (!isDesktop) {
+      setUi({ sidebarOpen: true });
+      setTimeout(() => document.getElementById("dc-cwd-input")?.focus(), 50);
+      return;
+    }
+    const dir = state.meta?.primaryCwd;
+    if (dir) void createSession(dir);
+  };
+
   return (
     <div className="flex flex-1 items-center justify-center overflow-y-auto p-6">
-      <div className="flex max-w-lg flex-col items-center gap-5 text-center">
-        <LogoMark className="size-16 rounded-2xl shadow-xl" />
-        <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.02em]">Devin Console</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            A browser console for the Devin CLI over the Agent Client Protocol. Create a session from
-            the sidebar, or pick an existing one.
-          </p>
+      <div className="flex w-full max-w-xl flex-col items-center gap-8">
+        <DevinMark size={72} className="text-muted-foreground/25" />
+
+        <div className="flex w-full items-center justify-center gap-2">
+          <button
+            className="flex h-10 items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-all duration-150 hover:bg-accent active:scale-[0.98]"
+            onClick={newSession}
+          >
+            New session
+          </button>
+          <a
+            href="https://docs.devin.ai"
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-10 items-center rounded-xl px-3 text-sm text-muted-foreground transition-colors hover:text-primary"
+          >
+            Docs ↗
+          </a>
         </div>
-        <div className="grid w-full gap-2 text-left sm:grid-cols-2">
-          {TIPS.map(([title, body]) => (
-            <div key={title} className="rounded-xl border border-border bg-card p-3.5">
-              <div className="text-[13px] font-medium">{title}</div>
-              <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</div>
+
+        {recent.length > 0 && (
+          <div className="w-full">
+            <div className="mb-2 flex items-baseline justify-between px-1">
+              <span className="text-sm text-muted-foreground">Recent sessions</span>
+              <button
+                className="text-sm text-primary transition-opacity hover:opacity-80"
+                onClick={() => setUi({ modal: "palette" })}
+              >
+                View all
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="w-full rounded-2xl border border-border bg-card px-4 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              {recent.map((s) => (
+                <button
+                  key={s.sessionId}
+                  className="flex w-full items-center gap-2 border-b border-border/60 py-2.5 text-left text-[15px] transition-colors last:border-b-0 hover:text-primary"
+                  onClick={() => selectSession(s.sessionId)}
+                >
+                  <MessageSquareIcon className="size-3.5 flex-none text-muted-foreground/60" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{sessionLabel(s)}</span>
+                  <span className="flex-none text-[13px] text-muted-foreground">
+                    {relTime(s.updatedAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -94,7 +260,7 @@ function SetupBanner({ installed, authed, detail }: { installed: boolean; authed
             <p className="mt-2 text-sm text-muted-foreground">
               The devin CLI is not installed (or not on PATH). Install it, then restart this server.
             </p>
-            <pre className="mt-3 overflow-x-auto rounded-lg bg-muted/50 p-3 font-mono text-xs">{`# see https://docs.devin.ai/cli for installation\ndevin version`}</pre>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary p-3 font-mono text-xs">{`# see https://docs.devin.ai/cli for installation\ndevin version`}</pre>
           </>
         ) : (
           <>
@@ -102,7 +268,7 @@ function SetupBanner({ installed, authed, detail }: { installed: boolean; authed
               The devin CLI is installed but not authenticated. Log in on this machine, then reload the
               page.
             </p>
-            <pre className="mt-3 overflow-x-auto rounded-lg bg-muted/50 p-3 font-mono text-xs">{`devin auth login\ndevin auth status`}</pre>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary p-3 font-mono text-xs">{`devin auth login\ndevin auth status`}</pre>
           </>
         )}
         {detail && <p className="tnum mt-3 font-mono text-xs text-muted-foreground">{detail}</p>}
@@ -118,9 +284,7 @@ export default function ChatView({ session }: { session: SessionState | null }) 
   const state = useStore();
   const meta = state.meta;
   const setupNeeded = !!meta && (!meta.devin.installed || !meta.devin.authed);
-  const title = session
-    ? session.alias || session.title || `session ${session.sessionId.slice(0, 8)}`
-    : "Devin Console";
+  const title = session ? sessionLabel(session) : "Devin Remote";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -149,42 +313,29 @@ export default function ChatView({ session }: { session: SessionState | null }) 
         {session && <ModeSwitcher session={session} />}
         {session && <ModelPicker session={session} />}
         {session && <Gauge usage={session.usage} />}
-        <TooltipIconButton
-          tooltip="Terminals"
-          variant="ghost"
-          size="icon"
-          className={cn("size-9", state.ui.terminalOpen && "bg-accent text-foreground")}
-          onClick={() => setUi({ terminalOpen: !state.ui.terminalOpen })}
-        >
-          <SquareTerminalIcon className="size-4" />
-        </TooltipIconButton>
-        <TooltipIconButton
-          tooltip="Agent log"
-          variant="ghost"
-          size="icon"
-          className={cn("size-9", state.ui.logOpen && "bg-accent text-foreground")}
-          onClick={() => setUi({ logOpen: !state.ui.logOpen })}
-        >
-          <ScrollTextIcon className="size-4" />
-        </TooltipIconButton>
-        <TooltipIconButton
-          tooltip="Usage"
-          variant="ghost"
-          size="icon"
-          className="size-9"
-          onClick={() => setUi({ modal: "usage" })}
-        >
-          <ChartColumnIcon className="size-4" />
-        </TooltipIconButton>
-        <TooltipIconButton
-          tooltip="Settings"
-          variant="ghost"
-          size="icon"
-          className="size-9"
-          onClick={() => setUi({ modal: "settings" })}
-        >
-          <SettingsIcon className="size-4" />
-        </TooltipIconButton>
+        {session && (
+          <TooltipIconButton
+            tooltip="Terminals"
+            variant="ghost"
+            size="icon"
+            className={cn("size-9 text-muted-foreground", state.ui.terminalOpen && "bg-secondary text-foreground")}
+            onClick={() => setUi({ terminalOpen: !state.ui.terminalOpen })}
+          >
+            <SquareTerminalIcon className="size-4" />
+          </TooltipIconButton>
+        )}
+        {session && (
+          <TooltipIconButton
+            tooltip="Agent log"
+            variant="ghost"
+            size="icon"
+            className={cn("size-9 text-muted-foreground", state.ui.logOpen && "bg-secondary text-foreground")}
+            onClick={() => setUi({ logOpen: !state.ui.logOpen })}
+          >
+            <ScrollTextIcon className="size-4" />
+          </TooltipIconButton>
+        )}
+        {session && <OverflowMenu session={session} />}
       </header>
 
       {setupNeeded ? (
@@ -194,7 +345,7 @@ export default function ChatView({ session }: { session: SessionState | null }) 
           <SessionChat session={session} />
         </Suspense>
       ) : (
-        <EmptyState />
+        <Home />
       )}
     </div>
   );

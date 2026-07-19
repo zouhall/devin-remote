@@ -144,7 +144,7 @@ export class DevinAcp {
         fs: { readTextFile: true, writeTextFile: true },
         terminal: true,
       },
-      clientInfo: { name: "devin-console", version: "0.1.0" },
+      clientInfo: { name: "devin-remote", version: "0.1.0" },
     });
     return self;
   }

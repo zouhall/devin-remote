@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import type { SessionState } from "../state";
-import { setSessionConfig } from "../state";
+import { setSessionConfig, setUi, useStore } from "../state";
 import type { ConfigOptionValue } from "../types";
 import { fuzzyScore } from "../utils";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,8 @@ function familyLabel(family: string, models: ParsedModel[]): string {
 }
 
 export default memo(function ModelPicker({ session }: { session: SessionState }) {
-  const [open, setOpen] = useState(false);
+  const open = useStore().ui.modelPickerOpen;
+  const setOpen = (v: boolean) => setUi({ modelPickerOpen: v });
   const [query, setQuery] = useState("");
   const modelOpt = session.configOptions.find((o) => o.category === "model");
   const current = modelOpt?.currentValue ?? "";
@@ -95,12 +96,12 @@ export default memo(function ModelPicker({ session }: { session: SessionState })
   return (
     <>
       <button
-        className="flex h-8 max-w-44 items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:scale-[0.97]"
+        className="flex h-8 max-w-44 items-center gap-1 rounded-md px-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-[0.98]"
         onClick={() => setOpen(true)}
         title="Pick a model"
       >
-        <span className="tnum truncate font-mono">{currentModel?.name ?? current ?? "model"}</span>
-        <ChevronDownIcon className="size-3 flex-none" />
+        <span className="truncate">{currentModel?.name ?? current ?? "model"}</span>
+        <ChevronDownIcon className="size-3 flex-none opacity-60" />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl p-0" hideClose={false}>
@@ -155,7 +156,7 @@ export default memo(function ModelPicker({ session }: { session: SessionState })
                         </span>
                       )}
                       {m.speed && (
-                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                           {m.speed}
                         </span>
                       )}

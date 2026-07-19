@@ -31,13 +31,13 @@ const pkg = JSON.parse(
 ) as { version: string };
 
 if (wantVersion) {
-  console.log(`devin-console ${pkg.version}`);
+  console.log(`devin-remote ${pkg.version}`);
   process.exit(0);
 }
 if (wantHelp) {
-  console.log(`devin-console — a browser console for the Devin CLI (ACP)
+  console.log(`devin-remote — a browser console for the Devin CLI (ACP)
 
-Usage: devin-console [options]
+Usage: devin-remote [options]
 
 Options:
   --port <port>   Port to bind (default 7781, env PORT)
@@ -48,7 +48,7 @@ Options:
   --help          Show this help
 
 Requires: devin CLI on PATH and a completed 'devin auth login'.
-Data:   ~/.devin-console (override with DEVIN_CONSOLE_HOME)`);
+Data:   ~/.devin-remote (override with DEVIN_REMOTE_HOME)`);
   process.exit(0);
 }
 
@@ -88,7 +88,7 @@ const httpServer = http.createServer();
 
 const hub = new WsHub(httpServer, () => ({
   type: "config",
-  app: { name: "devin-console", version: pkg.version },
+  app: { name: "devin-remote", version: pkg.version },
   settings: store.settings,
 }));
 
@@ -146,7 +146,7 @@ const STATIC_MIME: Record<string, string> = {
 function serveStatic(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
   if (!webDir) {
     res.writeHead(200, { "content-type": "text/html" }).end(
-      `<h1>devin-console</h1><p>Web UI not built. Run <code>npm run build</code>, or use <code>npm run dev</code> and open <a href="http://localhost:5173">http://localhost:5173</a>.</p>`,
+      `<h1>devin-remote</h1><p>Web UI not built. Run <code>npm run build</code>, or use <code>npm run dev</code> and open <a href="http://localhost:5173">http://localhost:5173</a>.</p>`,
     );
     return;
   }
@@ -186,7 +186,7 @@ httpServer.on("request", (req, res) => {
 // ---- go --------------------------------------------------------------------
 httpServer.listen(PORT, HOST, async () => {
   const addr = `http://${HOST}:${PORT}`;
-  console.log(`devin-console ${pkg.version} listening on ${addr}`);
+  console.log(`devin-remote ${pkg.version} listening on ${addr}`);
   const check = await devinCheck();
   if (!check.installed) {
     console.warn("⚠  devin CLI not found on PATH — install it first: https://docs.devin.ai/cli");

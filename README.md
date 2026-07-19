@@ -1,4 +1,4 @@
-# Devin Console
+# Devin Remote
 
 A browser console for the [Devin CLI](https://docs.devin.ai/cli) — sessions,
 streaming chat, tool calls, permissions, modes, models, usage stats, terminals
@@ -7,7 +7,7 @@ and more, served locally over the **Agent Client Protocol (ACP)**.
 Think `kimi web`, but for Devin — and open source.
 
 ```
-npx devin-web-console
+npx devin-remote
 ```
 
 Then open http://127.0.0.1:7781 — that's it.
@@ -48,14 +48,14 @@ Then open http://127.0.0.1:7781 — that's it.
 devin auth login
 ```
 
-Devin Console drives your local `devin` agent — your credentials stay on your
+Devin Remote drives your local `devin` agent — your credentials stay on your
 machine, and everything runs against the CLI you already have.
 
 ## Usage
 
 ```bash
-npx devin-web-console            # start on :7781 and open the browser
-npx devin-web-console --port 9000 --no-open
+npx devin-remote            # start on :7781 and open the browser
+npx devin-remote --port 9000 --no-open
 ```
 
 | Flag        | Default     | Description                          |
@@ -65,8 +65,8 @@ npx devin-web-console --port 9000 --no-open
 | `--open` / `--no-open` | auto | Open the browser on start   |
 | `--version` |             | Print version                        |
 
-Data lives in `~/.devin-console/` (session aliases, settings, usage history,
-uploads). Override with `DEVIN_CONSOLE_HOME`.
+Data lives in `~/.devin-remote/` (session aliases, settings, usage history,
+uploads). Override with `DEVIN_REMOTE_HOME`.
 
 The server binds to loopback by default. Only use `--host 0.0.0.0` on networks
 you trust — there is no authentication layer yet.
@@ -74,10 +74,10 @@ you trust — there is no authentication layer yet.
 ## How it works
 
 ```
-browser (React SPA) ──REST/WS──> devin-console server ──stdio JSON-RPC (ACP)──> devin acp ──> Devin
+browser (React SPA) ──REST/WS──> devin-remote server ──stdio JSON-RPC (ACP)──> devin acp ──> Devin
 ```
 
-Devin Console spawns one `devin acp` process per workspace directory and speaks
+Devin Remote spawns one `devin acp` process per workspace directory and speaks
 the [Agent Client Protocol](https://agentclientprotocol.com) over stdio — the
 same protocol Zed uses to embed coding agents. Session updates stream to the
 browser over a WebSocket; your actions (prompts, permission decisions, mode and
@@ -87,8 +87,8 @@ relay.
 ## Development
 
 ```bash
-git clone https://github.com/zouhall/devin-web-console.git
-cd devin-web-console
+git clone https://github.com/zouhall/devin-remote.git
+cd devin-remote
 npm install
 npm run dev        # server on :7781 (tsx watch) + web on :5173 (vite)
 ```
@@ -113,7 +113,7 @@ v4, KaTeX, Mermaid, xterm.js).
 
 ## Disclaimer
 
-Devin Console is a community project and is **not affiliated with or endorsed
+Devin Remote is a community project and is **not affiliated with or endorsed
 by Cognition AI**. "Devin" is a trademark of Cognition AI. Requires a valid
 Devin account.
 

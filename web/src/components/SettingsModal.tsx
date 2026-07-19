@@ -87,7 +87,7 @@ export default function SettingsModal() {
     soundTest();
     const perm = await ensureNotificationPermission();
     if (perm === "granted") {
-      notifyDesktop("Devin Console", "Notifications are working.");
+      notifyDesktop("Devin Remote", "Notifications are working.");
     } else if (perm === "unsupported") {
       showNotice("this browser does not support notifications");
     } else {
@@ -191,7 +191,7 @@ export default function SettingsModal() {
                         <CheckIcon className="size-3" /> authenticated
                       </span>
                     ) : (
-                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                      <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700 dark:text-yellow-400">
                         not logged in
                       </span>
                     )}
@@ -216,13 +216,13 @@ export default function SettingsModal() {
             <div className="flex items-center justify-between gap-4 py-1.5">
               <span className="text-sm">App</span>
               <span className="tnum font-mono text-xs text-muted-foreground">
-                {meta?.app.name ?? "devin-console"} v{meta?.app.version ?? "…"}
+                Devin Remote v{meta?.app.version ?? "…"}
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               Data (aliases, usage, settings, uploads) lives in{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">~/.devin-console</code> — override with{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">DEVIN_CONSOLE_HOME</code>.
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">~/.devin-remote</code> — override with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">DEVIN_REMOTE_HOME</code>.
             </p>
           </Section>
         </div>

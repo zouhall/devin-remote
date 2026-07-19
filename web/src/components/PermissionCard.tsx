@@ -1,4 +1,4 @@
-// Permission requests — amber left-border cards below the thread, with
+// Permission requests — blue left-border cards below the thread, with
 // keyboard shortcuts (1/2/3…) mapped to the agent's options.
 
 import { memo, useEffect, useState, type FC } from "react";

@@ -100,6 +100,8 @@ export interface UiState {
   terminalOpen: boolean;
   logOpen: boolean;
   activeTerminalId: string | null;
+  /** Lifts the model dialog so both header and composer can open it. */
+  modelPickerOpen: boolean;
 }
 
 export interface AppState {

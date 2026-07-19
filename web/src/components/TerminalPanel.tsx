@@ -7,24 +7,24 @@ import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { SquareTerminalIcon, XIcon } from "lucide-react";
 
-// Matched to the design tokens (dark zinc surfaces, amber accent cursor).
+// Matched to the design tokens (warm surfaces, Devin blue accent cursor).
 const XTERM_THEME = {
   background: "#131316",
   foreground: "#e4e4e7",
-  cursor: "#e29a3c",
+  cursor: "#3b82f6",
   selectionBackground: "#3b3b42",
   black: "#1c1c21",
   red: "#f87171",
   green: "#4ade80",
-  yellow: "#e29a3c",
-  blue: "#7aa2f7",
+  yellow: "#eab308",
+  blue: "#60a5fa",
   magenta: "#bb9af7",
   cyan: "#22d3ee",
   white: "#e8e8ee",
   brightBlack: "#55555f",
   brightRed: "#fca5a5",
   brightGreen: "#86efac",
-  brightYellow: "#f5c97b",
+  brightYellow: "#facc15",
   brightBlue: "#93c5fd",
   brightMagenta: "#c4b5fd",
   brightCyan: "#67e8f9",

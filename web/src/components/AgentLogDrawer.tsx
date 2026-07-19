@@ -45,7 +45,7 @@ export default function AgentLogDrawer() {
             key={i}
             className={cn(
               "flex gap-2 whitespace-pre-wrap break-all text-muted-foreground",
-              /warn/i.test(e.level) && "text-amber-600 dark:text-amber-400",
+              /warn/i.test(e.level) && "text-yellow-600 dark:text-yellow-400",
               /error|err/i.test(e.level) && "text-red-600 dark:text-red-400",
             )}
           >

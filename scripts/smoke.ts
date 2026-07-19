@@ -12,7 +12,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { AcpManager } from "../server/src/manager.js";
 
-const cwd = path.join(os.tmpdir(), "devin-console-smoke");
+const cwd = path.join(os.tmpdir(), "devin-remote-smoke");
 await fs.mkdir(cwd, { recursive: true });
 
 const manager = new AcpManager({

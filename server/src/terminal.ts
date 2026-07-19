@@ -20,7 +20,7 @@ const MAX_OUTPUT = 1024 * 1024; // 1 MiB ring buffer per terminal
 /**
  * Implements the ACP terminal/* client methods with plain child_process.
  * No native pty dependency — agent commands are non-interactive, so piped
- * stdio is enough and `npx devin-console` stays build-free.
+ * stdio is enough and `npx devin-remote` stays build-free.
  */
 export class TerminalRunner {
   private terminals = new Map<string, Terminal>();

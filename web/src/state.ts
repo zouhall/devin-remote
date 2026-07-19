@@ -39,7 +39,7 @@ export * from "./store-types";
 
 let state: AppState = {
   meta: null,
-  settings: { theme: "dark", soundComplete: true, soundNotify: true, desktopNotify: false },
+  settings: { theme: "light", soundComplete: true, soundNotify: true, desktopNotify: false },
   sessions: {},
   activeSessionId: null,
   sessionsLoading: false,
@@ -55,6 +55,7 @@ let state: AppState = {
     terminalOpen: false,
     logOpen: false,
     activeTerminalId: null,
+    modelPickerOpen: false,
   },
 };
 
