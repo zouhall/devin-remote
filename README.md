@@ -1,16 +1,58 @@
+<div align="center">
+
 # Devin Remote
 
-A browser console for the [Devin CLI](https://docs.devin.ai/cli) — sessions,
-streaming chat, tool calls, permissions, modes, models, usage stats, terminals
-and more, served locally over the **Agent Client Protocol (ACP)**.
+**A browser console for the [Devin CLI](https://docs.devin.ai/cli) — drive your
+local Devin sessions from any browser, including your phone.**
 
+Sessions, streaming chat, tool calls, permissions, modes, models, usage stats
+and terminals, served locally over the
+[Agent Client Protocol](https://agentclientprotocol.com) (ACP).
 Think `kimi web`, but for Devin — and open source.
 
-```
+[![npm](https://img.shields.io/npm/v/devin-remote?color=cb3837&logo=npm)](https://www.npmjs.com/package/devin-remote)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node >= 20](https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?logo=node.js&logoColor=white)](https://nodejs.org)
+
+</div>
+
+```bash
 npx devin-remote
 ```
 
 Then open http://127.0.0.1:7781 — that's it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
+  <img alt="Devin Remote — streaming chat with markdown, a Mermaid sequence diagram, mode pills, model picker and the live session sidebar" src="docs/screenshots/hero-light.png">
+</picture>
+
+<table>
+  <tr>
+    <td width="34%">
+      <img alt="Chat on a phone — Mermaid diagram and streaming answer" src="docs/screenshots/mobile-chat.png">
+    </td>
+    <td width="34%">
+      <img alt="Session drawer on a phone" src="docs/screenshots/mobile-sessions.png">
+    </td>
+    <td width="32%" valign="top">
+      <img alt="Model catalog dialog — grouped by family with thinking-level and speed variants" src="docs/screenshots/model-picker.png"><br><br>
+      <img alt="Home screen with recent sessions" src="docs/screenshots/home-light.png"><br><br>
+      <img alt="The composer — mode chip, model, attachments" src="docs/screenshots/composer.png">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub>On your phone — same server, same sessions</sub></td>
+    <td align="center"><sub>Every session, every workspace</sub></td>
+    <td align="center"><sub>Model catalog · home · composer</sub></td>
+  </tr>
+</table>
+
+<details>
+<summary><b>Dark mode</b></summary>
+<br>
+<img alt="Devin Remote in dark mode" src="docs/screenshots/hero-dark.png">
+</details>
 
 ## Features
 
