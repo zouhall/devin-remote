@@ -11,6 +11,30 @@ function textOf(content: unknown): string {
   return c?.text ?? "";
 }
 
+const CHUNK_KINDS = new Set(["user_message_chunk", "agent_message_chunk", "agent_thought_chunk"]);
+
+/**
+ * Merge consecutive streaming chunks of the same kind into one entry, so the
+ * transcript renders one paragraph (and one "You" header) per message instead
+ * of one per token fragment.
+ */
+function coalesceChunks(entries: Array<{ ts: number; update: AnyUpdate }>): Array<{ ts: number; update: AnyUpdate }> {
+  const out: Array<{ ts: number; update: AnyUpdate }> = [];
+  for (const e of entries) {
+    const kind = e.update.sessionUpdate;
+    const prev = out[out.length - 1];
+    if (prev && kind && CHUNK_KINDS.has(kind) && prev.update.sessionUpdate === kind) {
+      prev.update = {
+        ...prev.update,
+        content: { type: "text", text: textOf(prev.update.content) + textOf(e.update.content) },
+      };
+      continue;
+    }
+    out.push({ ts: e.ts, update: e.update });
+  }
+  return out;
+}
+
 /** Render the recorded session updates as a readable markdown transcript. */
 function toMarkdown(sessionId: string, entries: Array<{ ts: number; update: AnyUpdate }>): string {
   const lines: string[] = [`# Devin session ${sessionId}`, ""];
@@ -64,6 +88,6 @@ export function buildSessionZip(
       JSON.stringify({ sessionId, exportedAt: new Date().toISOString(), ...meta }, null, 2),
     ),
     "updates.jsonl": strToU8(entries.map((e) => JSON.stringify(e.update)).join("\n") + "\n"),
-    "transcript.md": strToU8(toMarkdown(sessionId, entries)),
+    "transcript.md": strToU8(toMarkdown(sessionId, coalesceChunks(entries))),
   });
 }

@@ -34,7 +34,7 @@ async function readBody(req: IncomingMessage, limit = 10 * 1024 * 1024): Promise
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > limit) throw new Error("body too large");
+    if (size > limit) throw Object.assign(new Error("body too large"), { status: 413 });
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks);
