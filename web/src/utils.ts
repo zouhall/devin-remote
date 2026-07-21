@@ -134,8 +134,10 @@ export function extractMentions(text: string): string[] {
 
 /** Resolve a mention path against the session cwd into a file:// URI. */
 export function mentionToUri(mention: string, cwd: string): string {
-  let p = mention;
-  if (p.startsWith("~/")) p = p; // leave ~ for the agent side; uri still needs a path
-  const abs = p.startsWith("/") ? p : `${cwd.replace(/[/\\]+$/, "")}/${p}`;
+  // `~` can't be resolved client-side — pass it through untouched and let the
+  // agent expand it. Resolving it against cwd produced /cwd/~/x, a path that
+  // never exists.
+  if (mention.startsWith("~")) return `file://${mention}`;
+  const abs = mention.startsWith("/") ? mention : `${cwd.replace(/[/\\]+$/, "")}/${mention}`;
   return `file://${abs}`;
 }

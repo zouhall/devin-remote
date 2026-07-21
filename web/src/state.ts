@@ -76,8 +76,17 @@ export function getState(): AppState {
   return state;
 }
 
-export function useStore(): AppState {
-  return useSyncExternalStore(subscribe, getState);
+/**
+ * Subscribe to the store. Prefer the selector form: during streaming the
+ * store emits on every chunk, and whole-state subscribers re-render each
+ * time. A selector must return a stable reference (a state slice, primitive,
+ * or memo-cached value) — useSyncExternalStore bails out via Object.is.
+ */
+export function useStore(): AppState;
+export function useStore<T>(selector: (s: AppState) => T): T;
+export function useStore<T>(selector?: (s: AppState) => T): T | AppState {
+  const getSnapshot: () => T | AppState = selector ? () => selector(state) : getState;
+  return useSyncExternalStore(subscribe, getSnapshot);
 }
 
 function setState(partial: Partial<AppState>): void {
@@ -90,10 +99,19 @@ function setState(partial: Partial<AppState>): void {
 
 /** sessionId → live updates queued while a history sync is in flight. */
 const syncQueues = new Map<string, SessionUpdate[]>();
+/**
+ * sessionId → sync generation. A resync (WS reconnect) can start while a
+ * previous sync's awaits are still in flight; the stale continuation must
+ * abandon the session or it re-applies history on top of the fresh sync and
+ * duplicates the timeline.
+ */
+const syncEpochs = new Map<string, number>();
 /** terminalId → raw output (may contain ANSI). */
 const termBuffers = new Map<string, string>();
 
 const TERM_BUFFER_CAP = 512 * 1024;
+/** Total bytes kept across all terminal buffers before old exited ones are dropped. */
+const TERM_TOTAL_CAP = 4 * 1024 * 1024;
 
 export function getTerminalOutput(terminalId: string): string {
   return termBuffers.get(terminalId) ?? "";
@@ -263,6 +281,13 @@ export function selectSession(sessionId: string): void {
     ui: { ...state.ui, sidebarOpen: false },
   });
   if (s.synced || syncQueues.has(sessionId)) return;
+  startSessionSync(sessionId);
+}
+
+function startSessionSync(sessionId: string): void {
+  const epoch = (syncEpochs.get(sessionId) ?? 0) + 1;
+  syncEpochs.set(sessionId, epoch);
+  const current = () => syncEpochs.get(sessionId) === epoch;
 
   resetSessionContent(sessionId);
   syncQueues.set(sessionId, []);
@@ -275,7 +300,8 @@ export function selectSession(sessionId: string): void {
     } catch {
       /* no server-side log */
     }
-    for (const u of updates) applySessionUpdate(sessionId, u);
+    if (!current()) return;
+    for (const u of updates) applySessionUpdate(sessionId, u, { live: false });
     updateSession(sessionId, (d) => {
       collapseRepeatedGenerations(d);
       d.running = false; // history is a snapshot; liveness comes from live events
@@ -288,11 +314,12 @@ export function selectSession(sessionId: string): void {
     //    replay and can be dropped. A short grace window catches stragglers.
     let openOk = false;
     try {
-      await api.openSession(sessionId, s.cwd);
+      await api.openSession(sessionId, state.sessions[sessionId]?.cwd);
       openOk = true;
     } catch {
       /* loadSession unsupported/failed — queued events are genuinely live */
     }
+    if (!current()) return;
     const queued = syncQueues.get(sessionId) ?? [];
     updateSession(sessionId, (d) => {
       d.synced = true;
@@ -305,7 +332,7 @@ export function selectSession(sessionId: string): void {
       });
     } else {
       setTimeout(() => {
-        syncQueues.delete(sessionId);
+        if (current()) syncQueues.delete(sessionId);
       }, 500);
     }
   })();
@@ -319,7 +346,7 @@ export function resyncActiveSession(): void {
   updateSession(id, (d) => {
     d.synced = false;
   });
-  selectSession(id);
+  startSessionSync(id);
 }
 
 export async function createSession(cwd: string): Promise<void> {
@@ -394,7 +421,11 @@ function normalizeToolContent(items: ToolCallContent[] | undefined): ToolCallCon
   return Array.isArray(items) ? items : [];
 }
 
-export function applySessionUpdate(sessionId: string, update: SessionUpdate): void {
+export function applySessionUpdate(
+  sessionId: string,
+  update: SessionUpdate,
+  opts?: { live?: boolean },
+): void {
   // Don't clobber an existing session's cwd with the primary-cwd fallback.
   ensureSession({
     sessionId,
@@ -511,7 +542,9 @@ export function applySessionUpdate(sessionId: string, update: SessionUpdate): vo
       default:
         break;
     }
-    d.updatedAt = new Date().toISOString();
+    // History replay must not bump recency — it would hoist every opened
+    // session to the top of the sidebar just for being viewed.
+    if (opts?.live !== false) d.updatedAt = new Date().toISOString();
   });
 }
 
@@ -552,12 +585,31 @@ function appendTerminalOutput(terminalId: string, sessionId: string, data: strin
     resetSeq += 1;
   }
   termBuffers.set(terminalId, buf);
+  pruneTerminalBuffers(terminalId);
   setState({
     terminals: {
       ...state.terminals,
       [terminalId]: { ...meta, version: meta.version + 1, resetSeq },
     },
   });
+}
+
+/**
+ * Long sessions can accumulate many finished terminals; without a global cap
+ * their buffers pin memory for the whole tab lifetime. Drop the oldest
+ * buffers over the cap — buffers only, the metadata (tabs, exit badges)
+ * stays — and never the terminal being written or the one on screen.
+ */
+function pruneTerminalBuffers(currentId: string): void {
+  let total = 0;
+  for (const buf of termBuffers.values()) total += buf.length;
+  if (total <= TERM_TOTAL_CAP) return;
+  for (const [id, buf] of termBuffers) {
+    if (id === currentId || id === state.ui.activeTerminalId) continue;
+    termBuffers.delete(id);
+    total -= buf.length;
+    if (total <= TERM_TOTAL_CAP) return;
+  }
 }
 
 // ---------------------------------------------------------------------------
