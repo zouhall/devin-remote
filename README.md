@@ -65,11 +65,34 @@ npx devin-remote --port 9000 --no-open
 | `--open` / `--no-open` | auto | Open the browser on start   |
 | `--version` |             | Print version                        |
 
+Environment: `PORT`, `DEVIN_REMOTE_HOME` (data dir), and
+`DEVIN_REMOTE_ALLOWED_HOSTS` — comma-separated extra hostnames accepted by
+the CSRF guard (see [Security](#security)).
+
 Data lives in `~/.devin-remote/` (session aliases, settings, usage history,
 uploads). Override with `DEVIN_REMOTE_HOME`.
 
+## Security
+
 The server binds to loopback by default. Only use `--host 0.0.0.0` on networks
-you trust — there is no authentication layer yet.
+you trust (a Tailscale tailnet, a LAN behind your router) — there is no
+authentication layer yet; token auth is on the roadmap.
+
+The API and WebSocket are protected by a **CSRF / DNS-rebinding guard**: a
+request's `Origin` must match its `Host` (including the port), and `Host`
+must be a loopback name, the machine's hostname, an IP literal, or an
+explicitly allowed name. This stops arbitrary web pages — including apps on
+other ports of the same machine — from driving your Devin.
+
+If you access Devin Remote through a **reverse proxy or tunnel** (nginx,
+Caddy, `tailscale serve`, a MagicDNS name), allow its hostname:
+
+```bash
+DEVIN_REMOTE_ALLOWED_HOSTS=devin.example.com,machine.tailnet-name.ts.net npx devin-remote
+```
+
+Uploads are served with `nosniff` (and a neutering CSP for SVG), the upload
+body is capped at 25 MiB, and file access is confined to the workspace.
 
 ## How it works
 

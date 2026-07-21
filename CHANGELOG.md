@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.1
+
+Hardening release — a full code review of the server and frontend, twice
+adversarially re-reviewed. First version published to npm.
+
+- **Security**: CSRF/DNS-rebinding guard on the API and WebSocket — arbitrary
+  web pages (including apps on other ports of the same machine) can no longer
+  send prompts or approve permission requests. `Origin` must match `Host`
+  (port included); `DEVIN_REMOTE_ALLOWED_HOSTS` allows reverse proxies and
+  tunnels. Uploads: streamed to disk with a 25 MiB cap, `nosniff`, neutering
+  CSP for SVG.
+- **Stability**: the server no longer crashes on malformed %-escaped URLs, a
+  missing `devin` binary, failed agent commands, disk errors mid-upload, or
+  static files swapped mid-request; `waitForExit` callers no longer hang;
+  orphaned `devin acp` children are killed on failed handshakes; `store.json`
+  writes are atomic; stale permission cards are cleared on timeout/exit;
+  WS keepalive pings drop dead connections.
+- **Performance**: streaming no longer re-renders the whole thread per chunk
+  (selector-based store subscriptions, message conversion caches, memoized
+  thread); WS reconnect uses exponential backoff; terminal buffers are capped
+  globally.
+- **Fixes**: reconnect resync no longer duplicates the timeline; viewing a
+  session no longer reorders the sidebar; permission keyboard shortcuts
+  respect the busy gate; `~/` file mentions pass through for agent-side
+  expansion; Mermaid diagrams no longer vanish during streaming; transcript
+  export coalesces streamed chunks into readable messages.
+
 ## 0.3.0
 
 Renamed to **Devin Remote** and redesigned to reproduce Devin's own visual language.
