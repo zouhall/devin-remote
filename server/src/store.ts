@@ -40,6 +40,16 @@ export class Store {
     this.uploadsDir = path.join(this.dataDir, "uploads");
     this.file = path.join(this.dataDir, "store.json");
     fs.mkdirSync(this.uploadsDir, { recursive: true });
+    // Sweep temp files left by writes interrupted before their rename.
+    for (const f of fs.readdirSync(this.dataDir)) {
+      if (f.startsWith("store.json.") && f.endsWith(".tmp")) {
+        try {
+          fs.unlinkSync(path.join(this.dataDir, f));
+        } catch {
+          /* already gone */
+        }
+      }
+    }
     this.data = this.load();
   }
 

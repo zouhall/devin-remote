@@ -24,9 +24,13 @@ function coalesceChunks(entries: Array<{ ts: number; update: AnyUpdate }>): Arra
     const kind = e.update.sessionUpdate;
     const prev = out[out.length - 1];
     if (prev && kind && CHUNK_KINDS.has(kind) && prev.update.sessionUpdate === kind) {
+      // Agent/thought chunks are token fragments (concatenate raw); user
+      // chunks are whole blocks, and may even be separate prompts when the
+      // agent produced nothing in between — keep them apart with a blank line.
+      const sep = kind === "user_message_chunk" ? "\n\n" : "";
       prev.update = {
         ...prev.update,
-        content: { type: "text", text: textOf(prev.update.content) + textOf(e.update.content) },
+        content: { type: "text", text: textOf(prev.update.content) + sep + textOf(e.update.content) },
       };
       continue;
     }

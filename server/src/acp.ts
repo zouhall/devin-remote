@@ -153,7 +153,12 @@ export class DevinAcp {
     // A missing binary emits 'error' (no 'exit'); a broken install exits
     // before the handshake. Either way the server must survive and start()
     // must reject instead of hanging.
-    proc.on("error", (procErr) => finish(null, new Error(`failed to start devin acp: ${procErr.message}`)));
+    proc.on("error", (procErr) => {
+      finish(null, new Error(`failed to start devin acp: ${procErr.message}`));
+      // 'error' does not imply the child died (post-spawn stdio errors) —
+      // we just declared it dead, so make that true rather than leak it.
+      self.kill();
+    });
     proc.on("exit", (code) => finish(code));
     proc.stdin!.on("error", () => {});
     proc.stdout!.on("error", () => {});
