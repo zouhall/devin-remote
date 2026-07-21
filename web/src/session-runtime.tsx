@@ -30,6 +30,24 @@ function safeArgsText(raw: unknown): string | undefined {
   }
 }
 
+// Conversion caches, keyed by store-object identity. The store is immutable:
+// a changed message/tool call is a NEW object, so a cache hit means "content
+// unchanged" and assistant-ui gets the exact same ThreadMessageLike reference
+// back. Without this, every streamed chunk rebuilt every message object and
+// re-rendered the whole thread (the mobile "render storm").
+const userMsgCache = new WeakMap<ChatMessage, ThreadMessageLike>();
+const assistantMsgCache = new WeakMap<ChatMessage, ThreadMessageLike>();
+const toolMsgCache = new WeakMap<ToolCallState, ThreadMessageLike>();
+
+function cached<K extends object>(cache: WeakMap<K, ThreadMessageLike>, key: K, build: (k: K) => ThreadMessageLike): ThreadMessageLike {
+  let v = cache.get(key);
+  if (!v) {
+    v = build(key);
+    cache.set(key, v);
+  }
+  return v;
+}
+
 function userMessage(m: ChatMessage): ThreadMessageLike {
   return {
     id: m.id,
@@ -84,10 +102,14 @@ export function sessionToMessages(s: SessionState): ThreadMessageLike[] {
     if (item.kind === "message") {
       const m = s.messages[item.id];
       if (!m) continue;
-      out.push(m.role === "user" ? userMessage(m) : assistantMessage(m));
+      out.push(
+        m.role === "user"
+          ? cached(userMsgCache, m, userMessage)
+          : cached(assistantMsgCache, m, assistantMessage),
+      );
     } else {
       const t = s.toolCalls[item.id];
-      if (t) out.push(toolCallMessage(t));
+      if (t) out.push(cached(toolMsgCache, t, toolCallMessage));
     }
   }
   return out;

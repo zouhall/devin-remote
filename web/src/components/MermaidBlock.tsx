@@ -32,16 +32,26 @@ export const MermaidBlock = memo(function MermaidBlock({ code }: SyntaxHighlight
       void loadMermaid().then((mermaid) => {
         if (cancelled) return;
         const id = `mmd-${++mermaidSeq}`;
+        // mermaid.render can leave scratch nodes (#id / #d{id}) in the DOM on
+        // failure. Clean them up ONLY when the render didn't complete: the
+        // returned svg's root carries id={id}, so removing #id after setSvg
+        // would delete the diagram we just displayed.
+        const removeScratch = () => {
+          document.getElementById(id)?.remove();
+          document.getElementById(`d${id}`)?.remove();
+        };
         mermaid
           .render(id, code.replace(/\n$/, ""))
           .then(({ svg }) => {
-            if (!cancelled) {
-              setSvg(svg);
-              setError(null);
+            if (cancelled) {
+              removeScratch();
+              return;
             }
+            setSvg(svg);
+            setError(null);
           })
           .catch((err) => {
-            document.getElementById(id)?.remove();
+            removeScratch();
             if (!cancelled) {
               setSvg(null);
               setError(err instanceof Error ? err.message : String(err));

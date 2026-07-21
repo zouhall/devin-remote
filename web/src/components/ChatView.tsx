@@ -136,7 +136,7 @@ function OverflowMenu({ session }: { session: SessionState }) {
           <button
             className={item}
             onClick={() => {
-              window.open(api.exportUrl(session.sessionId), "_blank");
+              window.open(api.exportUrl(session.sessionId), "_blank", "noopener,noreferrer");
               setOpen(false);
             }}
           >

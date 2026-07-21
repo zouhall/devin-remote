@@ -259,7 +259,7 @@ export default function Sidebar() {
                     className="size-7"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(api.exportUrl(s.sessionId), "_blank");
+                      window.open(api.exportUrl(s.sessionId), "_blank", "noopener,noreferrer");
                     }}
                   >
                     <DownloadIcon className="size-3.5" />

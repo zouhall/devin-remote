@@ -40,21 +40,26 @@ import {
   SquareIcon,
 } from "lucide-react";
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
   useState,
   type FC,
 } from "react";
+import type { ConfigOption } from "@/types";
 
-export const Thread: FC = () => {
+// memo: the parent tree re-renders on every store emit (once per streamed
+// chunk); everything below subscribes narrowly, so the cascade stops here.
+export const Thread: FC = memo(function Thread() {
   const isEmpty = useAuiState((s) => s.thread.messages.length === 0);
   const isLoading = useAuiState((s) => s.thread.isLoading);
   // Belt-and-braces: if our store already has timeline items but the runtime
   // hasn't caught up, show the skeleton — never a wrong "new session" hero.
-  const state = useStore();
-  const active = state.activeSessionId ? state.sessions[state.activeSessionId] : null;
-  const storeEmpty = !active || active.timeline.length === 0;
+  const storeEmpty = useStore((s) => {
+    const active = s.activeSessionId ? s.sessions[s.activeSessionId] : null;
+    return !active || active.timeline.length === 0;
+  });
   const showSkeleton = isEmpty && (isLoading || !storeEmpty);
   const showHero = isEmpty && !isLoading && storeEmpty;
 
@@ -92,7 +97,7 @@ export const Thread: FC = () => {
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
   );
-};
+});
 
 const HistorySkeleton: FC = () => (
   <div className="flex flex-col gap-5" aria-label="Loading history">
@@ -187,27 +192,40 @@ async function uploadImage(file: File): Promise<{
   }
 }
 
+// Stable empty fallback: returning a fresh [] from a selector would defeat
+// useSyncExternalStore's Object.is bail-out and re-render on every emit.
+const EMPTY_CONFIG_OPTIONS: ConfigOption[] = [];
+
 const Composer: FC = () => {
   const composer = useComposerRuntime();
-  const state = useStore();
+  // Narrow, reference-stable slices instead of the whole store — the composer
+  // must not re-render per streamed chunk (it owns the focused textarea).
+  const sessionId = useStore((s) => s.activeSessionId);
+  const sessionCwd = useStore((s) => (s.activeSessionId ? s.sessions[s.activeSessionId]?.cwd ?? null : null));
+  const configOptions = useStore(
+    (s) => (s.activeSessionId ? s.sessions[s.activeSessionId]?.configOptions : undefined) ?? EMPTY_CONFIG_OPTIONS,
+  );
+  const currentModeId = useStore((s) =>
+    s.activeSessionId ? s.sessions[s.activeSessionId]?.currentModeId ?? null : null,
+  );
+  const composerInject = useStore((s) => s.composerInject);
   const isEmpty = useAuiState((s) => s.thread.messages.length === 0);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const session = state.activeSessionId ? state.sessions[state.activeSessionId] : null;
-  const modeOpt = session?.configOptions.find((o) => o.category === "mode");
-  const currentMode = session ? (session.currentModeId ?? modeOpt?.currentValue ?? "") : "";
+  const modeOpt = sessionId ? configOptions.find((o) => o.category === "mode") : undefined;
+  const currentMode = sessionId ? (currentModeId ?? modeOpt?.currentValue ?? "") : "";
   const currentModeOpt = modeOpt?.options.find((o) => o.value === currentMode);
-  const modelOpt = session?.configOptions.find((o) => o.category === "model");
+  const modelOpt = sessionId ? configOptions.find((o) => o.category === "model") : undefined;
   const currentModel = modelOpt?.options.find((o) => o.value === modelOpt.currentValue);
 
   const cycleMode = () => {
-    if (!session || !modeOpt || modeOpt.options.length === 0) return;
+    if (!sessionId || !modeOpt || modeOpt.options.length === 0) return;
     const idx = modeOpt.options.findIndex((o) => o.value === currentMode);
     const next = modeOpt.options[(idx + 1) % modeOpt.options.length];
-    void setSessionConfig(session.sessionId, "mode", next.value);
+    void setSessionConfig(sessionId, "mode", next.value);
   };
 
   const focusCwdPicker = () => {
@@ -265,17 +283,16 @@ const Composer: FC = () => {
 
   // Consume palette injections (e.g. "/review ").
   useEffect(() => {
-    const inject = state.composerInject;
-    if (!inject) return;
+    if (!composerInject) return;
     const current = composer.getState().text;
-    composer.setText(current ? `${current.replace(/\s+$/, "")} ${inject.text}` : inject.text);
+    composer.setText(current ? `${current.replace(/\s+$/, "")} ${composerInject.text}` : composerInject.text);
     inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.composerInject?.seq]);
+  }, [composerInject?.seq]);
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, [session?.sessionId]);
+  }, [sessionId]);
 
   return (
     <ComposerPrimitive.Root className="relative flex w-full flex-col gap-1.5">
@@ -383,7 +400,7 @@ const Composer: FC = () => {
           </AuiIf>
         </div>
       </div>
-      {session && (
+      {sessionId && (
         <div className="flex items-center gap-3 px-2 text-[11px] text-muted-foreground/80">
           <button
             type="button"
@@ -392,7 +409,7 @@ const Composer: FC = () => {
             onClick={focusCwdPicker}
           >
             <FolderIcon className="size-3 flex-none" />
-            <span className="tnum truncate font-mono">{session.cwd || "Select a directory…"}</span>
+            <span className="tnum truncate font-mono">{sessionCwd || "Select a directory…"}</span>
           </button>
           <span className="flex-1" />
           <a

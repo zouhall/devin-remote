@@ -1,7 +1,7 @@
 // Permission requests — blue left-border cards below the thread, with
 // keyboard shortcuts (1/2/3…) mapped to the agent's options.
 
-import { memo, useEffect, useState, type FC } from "react";
+import { memo, useEffect, useRef, useState, type FC } from "react";
 import { ShieldAlertIcon } from "lucide-react";
 import type { PendingPermission } from "../state";
 import { resolvePermission, useStore } from "../state";
@@ -73,12 +73,20 @@ export const PermissionStack: FC = memo(function PermissionStack() {
   const session = state.activeSessionId ? state.sessions[state.activeSessionId] : null;
   const permissions = session?.permissions ?? [];
   const [busy, setBusy] = useState(false);
+  // Ref-backed gate: the keydown listener closes over one render's `busy`,
+  // so key repeat could double-resolve a request through a stale false.
+  const busyRef = useRef(false);
 
   const choose = async (requestId: string, optionId: string | null) => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
-    await resolvePermission(requestId, optionId);
-    setBusy(false);
+    try {
+      await resolvePermission(requestId, optionId);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
   };
 
   const first = permissions[0];
@@ -91,11 +99,12 @@ export const PermissionStack: FC = memo(function PermissionStack() {
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= first.options.length) {
         e.preventDefault();
-        void resolvePermission(first.requestId, first.options[n - 1].optionId);
+        void choose(first.requestId, first.options[n - 1].optionId);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [first]);
 
   if (permissions.length === 0) return null;
