@@ -1,7 +1,9 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
+import { once } from "node:events";
+import { finished } from "node:stream/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Store } from "./store.js";
 
@@ -18,6 +20,8 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
 };
 
+const MAX_UPLOAD = 25 * 1024 * 1024;
+
 export interface UploadMeta {
   id: string;
   name: string;
@@ -28,6 +32,11 @@ export interface UploadMeta {
 /**
  * Accepts a raw binary body (`POST /api/uploads?filename=x.png`) — no
  * multipart parsing needed. Returns metadata used to build ACP content blocks.
+ *
+ * The body is streamed to disk (never buffered whole in memory). Oversize
+ * bodies are drained rather than destroyed: destroying the request socket
+ * would also kill the response, so the client would see a connection reset
+ * instead of the 413.
  */
 export async function saveUpload(
   req: IncomingMessage,
@@ -37,14 +46,37 @@ export async function saveUpload(
   const clean = path.basename(filename).replace(/[^\w.\- ]/g, "_") || "file";
   const id = `${randomUUID()}-${clean}`;
   const dest = path.join(store.uploadsDir, id);
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-  const buf = Buffer.concat(chunks);
-  if (buf.length === 0) throw new Error("empty upload");
-  if (buf.length > 25 * 1024 * 1024) throw new Error("upload too large (25 MiB max)");
-  await fs.writeFile(dest, buf);
+  const out = createWriteStream(dest, { flags: "wx" });
+  let size = 0;
+  let oversize = false;
+  try {
+    for await (const chunk of req) {
+      if (oversize) continue; // drain the rest so the 413 can be delivered
+      const buf = chunk as Buffer;
+      size += buf.length;
+      if (size > MAX_UPLOAD) {
+        oversize = true;
+        continue;
+      }
+      if (!out.write(buf)) await once(out, "drain");
+    }
+    out.end();
+    await finished(out);
+  } catch (err) {
+    out.destroy();
+    await fs.unlink(dest).catch(() => {});
+    throw err;
+  }
+  if (oversize) {
+    await fs.unlink(dest).catch(() => {});
+    throw Object.assign(new Error("upload too large (25 MiB max)"), { status: 413 });
+  }
+  if (size === 0) {
+    await fs.unlink(dest).catch(() => {});
+    throw Object.assign(new Error("empty upload"), { status: 400 });
+  }
   const mime = MIME[path.extname(clean).toLowerCase()] ?? "application/octet-stream";
-  return { id, name: clean, mime, size: buf.length };
+  return { id, name: clean, mime, size };
 }
 
 export async function serveUpload(
@@ -54,15 +86,31 @@ export async function serveUpload(
 ): Promise<void> {
   const clean = path.basename(id);
   const file = path.join(store.uploadsDir, clean);
-  const mime = MIME[path.extname(clean).toLowerCase()] ?? "application/octet-stream";
+  const ext = path.extname(clean).toLowerCase();
+  const mime = MIME[ext] ?? "application/octet-stream";
   try {
     const stat = await fs.stat(file);
-    res.writeHead(200, {
+    const headers: Record<string, string | number> = {
       "content-type": mime,
       "content-length": stat.size,
       "cache-control": "immutable, max-age=31536000",
+      // Uploads are user-supplied bytes served from our origin — never let
+      // the browser sniff them into something executable.
+      "x-content-type-options": "nosniff",
+    };
+    if (ext === ".svg") {
+      // SVG can carry script; neuter it when rendered from this origin.
+      headers["content-security-policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+    }
+    const stream = createReadStream(file);
+    stream.on("error", () => {
+      if (!res.headersSent) res.writeHead(500).end();
+      else res.destroy();
     });
-    createReadStream(file).pipe(res);
+    stream.once("open", () => {
+      res.writeHead(200, headers);
+      stream.pipe(res);
+    });
   } catch {
     res.writeHead(404).end("not found");
   }

@@ -24,6 +24,8 @@ export class Store {
   private file: string;
   private data: StoreShape;
   private saveTimer: NodeJS.Timeout | null = null;
+  private writeChain: Promise<void> = Promise.resolve();
+  private tmpSeq = 0;
 
   constructor() {
     this.dataDir =
@@ -58,8 +60,27 @@ export class Store {
     if (this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
-      void fsp.writeFile(this.file, JSON.stringify(this.data, null, 2));
+      this.persist();
     }, 250);
+  }
+
+  /**
+   * Atomic write: unique temp file + rename, serialized on a chain. A direct
+   * writeFile can be read back torn (crash mid-write), and a shared temp path
+   * lets two overlapping writes rename half-written JSON into place.
+   */
+  private persist() {
+    const json = JSON.stringify(this.data, null, 2);
+    const tmp = `${this.file}.${process.pid}.${++this.tmpSeq}.tmp`;
+    this.writeChain = this.writeChain
+      .then(async () => {
+        await fsp.writeFile(tmp, json);
+        await fsp.rename(tmp, this.file);
+      })
+      .catch((err) => {
+        console.error(`store: failed to write ${this.file}:`, err);
+        void fsp.unlink(tmp).catch(() => {});
+      });
   }
 
   flush() {
@@ -67,7 +88,18 @@ export class Store {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    const tmp = `${this.file}.${process.pid}.${++this.tmpSeq}.tmp`;
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
+      fs.renameSync(tmp, this.file);
+    } catch (err) {
+      console.error(`store: failed to flush ${this.file}:`, err);
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* nothing to clean */
+      }
+    }
   }
 
   get settings() {

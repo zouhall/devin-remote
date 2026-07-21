@@ -16,6 +16,8 @@ export interface DevinAcpEvents {
     toolCall: unknown,
     options: Array<{ optionId: string; name: string; kind: string }>,
   ) => void;
+  /** Fired when a pending request is resolved without the client (timeout, process exit). */
+  onPermissionResolved: (requestId: string) => void;
   onTerminalOutput: (terminalId: string, sessionId: string, data: string) => void;
   onTerminalExit: (terminalId: string, sessionId: string, exitCode: number | null, signal: string | null) => void;
   onExit: (code: number | null) => void;
@@ -77,6 +79,7 @@ export class DevinAcp {
           const timer = setTimeout(() => {
             pendingPermissions.delete(requestId);
             resolve({ outcome: { outcome: "cancelled" } });
+            ev.onPermissionResolved(requestId);
           }, 5 * 60 * 1000);
           pendingPermissions.set(requestId, { resolve, timer });
         });
@@ -128,24 +131,51 @@ export class DevinAcp {
     const conn = new acp.ClientSideConnection(() => clientWithExt, stream);
 
     const self = new DevinAcp(cwd, proc, conn, pendingPermissions);
-    proc.on("exit", (code) => {
+    let handshaken = false;
+    let failStart: (err: Error) => void = () => {};
+    const startFailed = new Promise<never>((_, reject) => {
+      failStart = reject;
+    });
+    const finish = (code: number | null, err?: Error) => {
+      if (self.exited) return;
       self.exited = true;
-      for (const [, p] of self.pendingPermissions) {
+      for (const [requestId, p] of self.pendingPermissions) {
         clearTimeout(p.timer);
         p.resolve({ outcome: { outcome: "cancelled" } });
+        ev.onPermissionResolved(requestId);
       }
       self.pendingPermissions.clear();
+      if (!handshaken) {
+        failStart(err ?? new Error(`devin acp exited (code ${code}) before the ACP handshake completed`));
+      }
       ev.onExit(code);
-    });
+    };
+    // A missing binary emits 'error' (no 'exit'); a broken install exits
+    // before the handshake. Either way the server must survive and start()
+    // must reject instead of hanging.
+    proc.on("error", (procErr) => finish(null, new Error(`failed to start devin acp: ${procErr.message}`)));
+    proc.on("exit", (code) => finish(code));
+    proc.stdin!.on("error", () => {});
+    proc.stdout!.on("error", () => {});
 
-    self.capabilities = await conn.initialize({
-      protocolVersion: acp.PROTOCOL_VERSION,
-      clientCapabilities: {
-        fs: { readTextFile: true, writeTextFile: true },
-        terminal: true,
-      },
-      clientInfo: { name: "devin-remote", version: "0.1.0" },
-    });
+    try {
+      self.capabilities = await Promise.race([
+        conn.initialize({
+          protocolVersion: acp.PROTOCOL_VERSION,
+          clientCapabilities: {
+            fs: { readTextFile: true, writeTextFile: true },
+            terminal: true,
+          },
+          clientInfo: { name: "devin-remote", version: "0.1.0" },
+        }),
+        startFailed,
+      ]);
+    } catch (err) {
+      // Never leave an orphaned child when the handshake fails.
+      self.kill();
+      throw err;
+    }
+    handshaken = true;
     return self;
   }
 

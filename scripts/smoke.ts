@@ -33,6 +33,7 @@ const manager = new AcpManager({
     resolvePermission(id, options[0]?.optionId ?? null);
   },
   onPermissionOwner: () => {},
+  onPermissionResolved: (id) => console.log(`  [permission] ${id} resolved without client`),
   onTerminalOutput: () => {},
   onTerminalExit: (id, _sid, code) => console.log(`  [terminal ${id}] exit=${code}`),
   onExit: (cwd, code) => console.log(`[process ${cwd}] exited code=${code}`),

@@ -65,12 +65,22 @@ export class TerminalRunner {
     };
     proc.stdout!.on("data", onData);
     proc.stderr!.on("data", onData);
-    proc.on("exit", (code, signal) => {
+    const settle = (code: number | null, signal: string | null) => {
+      if (term.exitCode !== null || term.signal !== null) return;
       term.exitCode = code;
       term.signal = signal;
       ev.onTerminalExit(id, term.sessionId, code, signal);
       for (const w of term.waiters) w();
       term.waiters = [];
+    };
+    proc.on("exit", (code, signal) => settle(code, signal));
+    // A nonexistent command emits 'error' with no 'exit' — without this the
+    // server crashes (unhandled 'error') and waitForExit callers hang forever.
+    proc.on("error", (err) => {
+      const msg = `[devin-remote] failed to start "${params.command}": ${err.message}\n`;
+      term.output = (term.output + msg).slice(-term.limit);
+      ev.onTerminalOutput(id, term.sessionId, msg);
+      settle(-1, null);
     });
 
     return { terminalId: id };
