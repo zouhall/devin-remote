@@ -1,5 +1,6 @@
 import http from "node:http";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
@@ -57,44 +58,62 @@ Env:    DEVIN_REMOTE_ALLOWED_HOSTS — comma-separated extra hostnames allowed
 
 // ---- CSRF / DNS-rebinding guard --------------------------------------------
 // Without this, any web page could fire fetch()/WebSocket at 127.0.0.1:7781
-// and drive Devin (send prompts, blind-approve permission requests). Origins
-// and Hosts are compared by hostname (not host:port): the Vite dev proxy and
-// reverse proxies rewrite the port, and that must not lock legit clients out.
+// and drive Devin (send prompts, blind-approve permission requests).
+// Host check (rebinding): allowlisted names or IP literals only. Origin check
+// (CSRF): must match the request Host — including the port when both sides
+// state one, so an app on another port of the same machine can't drive this
+// one — or be explicitly allowlisted via DEVIN_REMOTE_ALLOWED_HOSTS (for
+// Host-rewriting reverse proxies and tunnels).
 
-/** Lowercased hostname of a bare host, host:port, or full origin — null if unparseable. */
-function hostnameOf(value: string | undefined): string | null {
+/** Lowercased {hostname, explicit port} of a bare host, host:port, or origin — null if unparseable. */
+function hostParts(value: string | undefined): { host: string; port: string } | null {
   if (!value) return null;
   let v = value.trim().toLowerCase();
   if (!v) return null;
-  if (!/^[a-z][a-z0-9+.-]*:\/\//.test(v)) v = `http://${v}`;
+  const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//.test(v);
+  if (!hadScheme) v = `http://${v}`;
   try {
-    return new URL(v).hostname.replace(/^\[|\]$/g, "");
+    const u = new URL(v);
+    // For real origins resolve the scheme's default port; a bare Host header
+    // keeps "" (its scheme is unknowable behind a TLS-terminating proxy).
+    const port = u.port || (hadScheme ? (u.protocol === "https:" ? "443" : "80") : "");
+    return { host: u.hostname.replace(/^\[|\]$/g, ""), port };
   } catch {
     return null;
   }
 }
 
-const allowedHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
+const allowedHostnames = new Set(["localhost", "127.0.0.1", "::1", os.hostname().toLowerCase()]);
 {
-  const boundHost = hostnameOf(HOST);
-  if (boundHost && boundHost !== "0.0.0.0" && boundHost !== "::") allowedHostnames.add(boundHost);
+  const bound = hostParts(HOST);
+  if (bound && bound.host !== "0.0.0.0" && bound.host !== "::") allowedHostnames.add(bound.host);
 }
+/** User-declared proxy/tunnel names: valid as Host and as a non-matching Origin. */
+const extraAllowedHostnames = new Set<string>();
 for (const extra of (process.env.DEVIN_REMOTE_ALLOWED_HOSTS ?? "").split(",")) {
-  const hn = hostnameOf(extra);
-  if (hn) allowedHostnames.add(hn);
+  const p = hostParts(extra);
+  if (p) {
+    allowedHostnames.add(p.host);
+    extraAllowedHostnames.add(p.host);
+  }
 }
 
 function isAllowedRequest(req: http.IncomingMessage): boolean {
-  const host = hostnameOf(req.headers.host);
+  const host = hostParts(req.headers.host);
   if (!host) return false;
   // IP-literal Hosts can't be a DNS-rebinding vector (the attack needs the
   // attacker's DNS name in Host); other names must be explicitly allowed.
-  if (!allowedHostnames.has(host) && net.isIP(host) === 0) return false;
+  if (!allowedHostnames.has(host.host) && net.isIP(host.host) === 0) return false;
   const origin = req.headers.origin;
   if (origin === undefined) return true; // same-origin fetch / non-browser client
-  const originHost = hostnameOf(String(origin));
-  if (!originHost) return false; // includes "Origin: null"
-  return originHost === host || allowedHostnames.has(originHost);
+  const o = hostParts(String(origin));
+  if (!o) return false; // includes "Origin: null"
+  if (extraAllowedHostnames.has(o.host)) return true;
+  if (o.host !== host.host) return false;
+  // Portless Host (behind a proxy) accepts the default-port origin forms;
+  // an explicit Host port must match the origin's exactly.
+  if (host.port === "") return o.port === "80" || o.port === "443";
+  return o.port === host.port;
 }
 
 // ---- devin CLI checks ------------------------------------------------------

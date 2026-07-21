@@ -597,19 +597,32 @@ function appendTerminalOutput(terminalId: string, sessionId: string, data: strin
 /**
  * Long sessions can accumulate many finished terminals; without a global cap
  * their buffers pin memory for the whole tab lifetime. Drop the oldest
- * buffers over the cap — buffers only, the metadata (tabs, exit badges)
- * stays — and never the terminal being written or the one on screen.
+ * EXITED terminals' buffers over the cap — buffers only, the metadata (tabs,
+ * exit badges) stays — never a still-running terminal, the one being written,
+ * or the one on screen. Pruned metas get a resetSeq bump so a mounted xterm
+ * view knows its backing buffer restarted.
  */
 function pruneTerminalBuffers(currentId: string): void {
   let total = 0;
   for (const buf of termBuffers.values()) total += buf.length;
   if (total <= TERM_TOTAL_CAP) return;
+  const pruned: string[] = [];
   for (const [id, buf] of termBuffers) {
     if (id === currentId || id === state.ui.activeTerminalId) continue;
+    const meta = state.terminals[id];
+    if (meta && meta.exitCode === null && meta.signal === null) continue;
     termBuffers.delete(id);
+    pruned.push(id);
     total -= buf.length;
-    if (total <= TERM_TOTAL_CAP) return;
+    if (total <= TERM_TOTAL_CAP) break;
   }
+  if (pruned.length === 0) return;
+  const terminals = { ...state.terminals };
+  for (const id of pruned) {
+    const meta = terminals[id];
+    if (meta) terminals[id] = { ...meta, version: meta.version + 1, resetSeq: meta.resetSeq + 1 };
+  }
+  setState({ terminals });
 }
 
 // ---------------------------------------------------------------------------

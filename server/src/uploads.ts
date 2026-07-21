@@ -2,7 +2,6 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
-import { once } from "node:events";
 import { finished } from "node:stream/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Store } from "./store.js";
@@ -47,10 +46,33 @@ export async function saveUpload(
   const id = `${randomUUID()}-${clean}`;
   const dest = path.join(store.uploadsDir, id);
   const out = createWriteStream(dest, { flags: "wx" });
+  // Persistent listener: most of a slow upload is spent awaiting the client
+  // (`for await` on req), and a WriteStream error in that window (ENOSPC,
+  // uploads dir removed, EACCES) with no listener attached is an unhandled
+  // 'error' event — it would crash the whole process.
+  let streamErr: Error | null = null;
+  out.on("error", (err) => {
+    streamErr = err;
+  });
+  const waitDrain = () =>
+    new Promise<void>((resolve, reject) => {
+      if (streamErr) return reject(streamErr);
+      const onDrain = () => {
+        out.off("error", onErr);
+        resolve();
+      };
+      const onErr = (e: Error) => {
+        out.off("drain", onDrain);
+        reject(e);
+      };
+      out.once("drain", onDrain);
+      out.once("error", onErr);
+    });
   let size = 0;
   let oversize = false;
   try {
     for await (const chunk of req) {
+      if (streamErr) throw streamErr;
       if (oversize) continue; // drain the rest so the 413 can be delivered
       const buf = chunk as Buffer;
       size += buf.length;
@@ -58,8 +80,9 @@ export async function saveUpload(
         oversize = true;
         continue;
       }
-      if (!out.write(buf)) await once(out, "drain");
+      if (!out.write(buf)) await waitDrain();
     }
+    if (streamErr) throw streamErr;
     out.end();
     await finished(out);
   } catch (err) {
